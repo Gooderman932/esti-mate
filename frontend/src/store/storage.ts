@@ -1,58 +1,100 @@
 /**
- * AsyncStorage utilities for persisting estimates and settings
+ * Enhanced Storage utilities
  * 
- * All data is stored locally on device - no remote API calls
+ * Handles all local data persistence using AsyncStorage
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Estimate, AppSettings, defaultSettings } from '../types';
+import { v4 as uuidv4 } from 'uuid';
+import {
+  Estimate,
+  Material,
+  AppSettings,
+  SubscriptionStatus,
+  emptyBusiness,
+} from '../types';
 
 // Storage keys
-const STORAGE_KEYS = {
-  ESTIMATES: '@docscanner_estimates',
-  SETTINGS: '@docscanner_settings',
+const KEYS = {
+  ESTIMATES: '@estimator_estimates',
+  MATERIALS: '@estimator_materials',
+  SETTINGS: '@estimator_settings',
+  SUBSCRIPTION: '@estimator_subscription',
 };
 
-/**
- * Get all saved estimates from storage
- */
+// ========== MATERIALS ==========
+
+export async function getMaterials(): Promise<Material[]> {
+  try {
+    const json = await AsyncStorage.getItem(KEYS.MATERIALS);
+    return json ? JSON.parse(json) : [];
+  } catch (error) {
+    console.error('Error loading materials:', error);
+    return [];
+  }
+}
+
+export async function saveMaterials(materials: Material[]): Promise<void> {
+  try {
+    await AsyncStorage.setItem(KEYS.MATERIALS, JSON.stringify(materials));
+  } catch (error) {
+    console.error('Error saving materials:', error);
+    throw error;
+  }
+}
+
+export async function addMaterial(material: Material): Promise<void> {
+  const materials = await getMaterials();
+  materials.unshift(material);
+  await saveMaterials(materials);
+}
+
+export async function updateMaterial(updated: Material): Promise<void> {
+  const materials = await getMaterials();
+  const index = materials.findIndex(m => m.id === updated.id);
+  if (index !== -1) {
+    materials[index] = { ...updated, updatedAt: new Date().toISOString() };
+    await saveMaterials(materials);
+  }
+}
+
+export async function deleteMaterial(id: string): Promise<void> {
+  const materials = await getMaterials();
+  await saveMaterials(materials.filter(m => m.id !== id));
+}
+
+export async function getMaterialById(id: string): Promise<Material | null> {
+  const materials = await getMaterials();
+  return materials.find(m => m.id === id) || null;
+}
+
+// ========== ESTIMATES ==========
+
 export async function getEstimates(): Promise<Estimate[]> {
   try {
-    const json = await AsyncStorage.getItem(STORAGE_KEYS.ESTIMATES);
-    if (json) {
-      return JSON.parse(json);
-    }
-    return [];
+    const json = await AsyncStorage.getItem(KEYS.ESTIMATES);
+    return json ? JSON.parse(json) : [];
   } catch (error) {
     console.error('Error loading estimates:', error);
     return [];
   }
 }
 
-/**
- * Save all estimates to storage
- */
 export async function saveEstimates(estimates: Estimate[]): Promise<void> {
   try {
-    await AsyncStorage.setItem(STORAGE_KEYS.ESTIMATES, JSON.stringify(estimates));
+    await AsyncStorage.setItem(KEYS.ESTIMATES, JSON.stringify(estimates));
   } catch (error) {
     console.error('Error saving estimates:', error);
     throw error;
   }
 }
 
-/**
- * Add a new estimate
- */
 export async function addEstimate(estimate: Estimate): Promise<void> {
   const estimates = await getEstimates();
-  estimates.unshift(estimate); // Add to beginning
+  estimates.unshift(estimate);
   await saveEstimates(estimates);
 }
 
-/**
- * Update an existing estimate
- */
 export async function updateEstimate(updated: Estimate): Promise<void> {
   const estimates = await getEstimates();
   const index = estimates.findIndex(e => e.id === updated.id);
@@ -62,54 +104,55 @@ export async function updateEstimate(updated: Estimate): Promise<void> {
   }
 }
 
-/**
- * Delete an estimate
- */
 export async function deleteEstimate(id: string): Promise<void> {
   const estimates = await getEstimates();
-  const filtered = estimates.filter(e => e.id !== id);
-  await saveEstimates(filtered);
+  await saveEstimates(estimates.filter(e => e.id !== id));
 }
 
-/**
- * Get a single estimate by ID
- */
 export async function getEstimateById(id: string): Promise<Estimate | null> {
   const estimates = await getEstimates();
   return estimates.find(e => e.id === id) || null;
 }
 
-/**
- * Get app settings
- */
+// ========== SETTINGS ==========
+
 export async function getSettings(): Promise<AppSettings> {
   try {
-    const json = await AsyncStorage.getItem(STORAGE_KEYS.SETTINGS);
+    const json = await AsyncStorage.getItem(KEYS.SETTINGS);
     if (json) {
-      return { ...defaultSettings, ...JSON.parse(json) };
+      return JSON.parse(json);
     }
-    return defaultSettings;
+    // Create default settings with unique device ID
+    const defaults: AppSettings = {
+      business: emptyBusiness,
+      defaultTaxRate: 0,
+      nextEstimateNumber: 1,
+      nextInvoiceNumber: 1,
+      userId: uuidv4(),
+    };
+    await saveSettings(defaults);
+    return defaults;
   } catch (error) {
     console.error('Error loading settings:', error);
-    return defaultSettings;
+    return {
+      business: emptyBusiness,
+      defaultTaxRate: 0,
+      nextEstimateNumber: 1,
+      nextInvoiceNumber: 1,
+      userId: uuidv4(),
+    };
   }
 }
 
-/**
- * Save app settings
- */
 export async function saveSettings(settings: AppSettings): Promise<void> {
   try {
-    await AsyncStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
+    await AsyncStorage.setItem(KEYS.SETTINGS, JSON.stringify(settings));
   } catch (error) {
     console.error('Error saving settings:', error);
     throw error;
   }
 }
 
-/**
- * Get and increment the next estimate/invoice number
- */
 export async function getNextNumber(type: 'estimate' | 'invoice'): Promise<string> {
   const settings = await getSettings();
   let number: number;
@@ -127,4 +170,32 @@ export async function getNextNumber(type: 'estimate' | 'invoice'): Promise<strin
   
   await saveSettings(settings);
   return `${prefix}-${number.toString().padStart(4, '0')}`;
+}
+
+// ========== SUBSCRIPTION ==========
+
+export async function getSubscriptionStatus(): Promise<SubscriptionStatus | null> {
+  try {
+    const json = await AsyncStorage.getItem(KEYS.SUBSCRIPTION);
+    return json ? JSON.parse(json) : null;
+  } catch (error) {
+    console.error('Error loading subscription:', error);
+    return null;
+  }
+}
+
+export async function saveSubscriptionStatus(status: SubscriptionStatus): Promise<void> {
+  try {
+    await AsyncStorage.setItem(KEYS.SUBSCRIPTION, JSON.stringify(status));
+  } catch (error) {
+    console.error('Error saving subscription:', error);
+    throw error;
+  }
+}
+
+// ========== UTILITIES ==========
+
+export async function getActiveEstimatesCount(): Promise<number> {
+  const estimates = await getEstimates();
+  return estimates.filter(e => e.status !== 'paid').length;
 }

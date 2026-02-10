@@ -1,32 +1,31 @@
 /**
- * Type definitions for the Estimate/Invoice App
+ * Enhanced Types for Construction Estimator App
  * 
- * All data structures used throughout the application
+ * Includes Materials Catalog, Estimates, and Subscription types
  */
 
-// A single line item on an estimate/invoice
+// Material in the catalog
+export interface Material {
+  id: string;
+  name: string;
+  category: string;
+  unit: string; // e.g., "sq ft", "linear ft", "each", "bundle"
+  pricePerUnit: number;
+  notes: string;
+  storeLink?: string; // Optional URL to Lowe's, Home Depot, etc.
+  createdAt: string;
+  updatedAt: string;
+}
+
+// Line item on an estimate/invoice
 export interface LineItem {
   id: string;
+  materialId?: string; // Reference to material, or null for custom
   description: string;
   quantity: number;
   unitPrice: number;
+  unit: string;
   notes: string;
-  measurement?: string; // Optional measurement from document scan
-}
-
-// Corner points for perspective correction
-export interface Point {
-  x: number;
-  y: number;
-}
-
-// Document/image data with optional corner selection
-export interface DocumentImage {
-  uri: string; // Base64 URI of the image
-  originalWidth: number;
-  originalHeight: number;
-  corners?: Point[]; // 4 corners for perspective correction [TL, TR, BR, BL]
-  correctedUri?: string; // Base64 URI after perspective correction/crop
 }
 
 // Customer information
@@ -37,37 +36,85 @@ export interface CustomerInfo {
   address: string;
 }
 
-// Business information (user's company)
+// Business information
 export interface BusinessInfo {
   name: string;
   email: string;
   phone: string;
   address: string;
+  logoBase64?: string; // Pro feature
 }
 
-// Complete estimate/invoice record
+// Complete estimate/invoice
 export interface Estimate {
   id: string;
   type: 'estimate' | 'invoice';
-  number: string; // EST-001 or INV-001
+  number: string;
   createdAt: string;
   updatedAt: string;
   customer: CustomerInfo;
   lineItems: LineItem[];
-  documentImage?: DocumentImage;
   notes: string;
   status: 'draft' | 'sent' | 'accepted' | 'paid';
+  taxRate: number; // Per-document tax rate
 }
 
-// App settings stored in AsyncStorage
+// Subscription status
+export interface SubscriptionStatus {
+  userId: string;
+  isPro: boolean;
+  subscriptionId?: string;
+  status: 'none' | 'active' | 'canceled' | 'past_due';
+  currentPeriodEnd?: number;
+  cancelAtPeriodEnd?: boolean;
+}
+
+// App settings
 export interface AppSettings {
   business: BusinessInfo;
-  taxRate: number; // Percentage (e.g., 10 for 10%)
+  defaultTaxRate: number;
   nextEstimateNumber: number;
   nextInvoiceNumber: number;
+  userId: string; // Device ID for subscription tracking
 }
 
-// Default empty customer
+// Material categories
+export const MATERIAL_CATEGORIES = [
+  'Lumber',
+  'Drywall',
+  'Roofing',
+  'Flooring',
+  'Plumbing',
+  'Electrical',
+  'Paint',
+  'Hardware',
+  'Concrete',
+  'Insulation',
+  'Siding',
+  'Windows & Doors',
+  'HVAC',
+  'Landscaping',
+  'Other',
+];
+
+// Material units
+export const MATERIAL_UNITS = [
+  'each',
+  'sq ft',
+  'linear ft',
+  'bundle',
+  'roll',
+  'gallon',
+  'bag',
+  'box',
+  'sheet',
+  'piece',
+  'yard',
+  'ton',
+  'hour',
+];
+
+// Default empty values
 export const emptyCustomer: CustomerInfo = {
   name: '',
   email: '',
@@ -75,7 +122,6 @@ export const emptyCustomer: CustomerInfo = {
   address: '',
 };
 
-// Default empty business
 export const emptyBusiness: BusinessInfo = {
   name: '',
   email: '',
@@ -83,10 +129,8 @@ export const emptyBusiness: BusinessInfo = {
   address: '',
 };
 
-// Default settings
-export const defaultSettings: AppSettings = {
-  business: emptyBusiness,
-  taxRate: 0,
-  nextEstimateNumber: 1,
-  nextInvoiceNumber: 1,
+// Free tier limits
+export const FREE_TIER_LIMITS = {
+  maxActiveEstimates: 5,
+  canUploadLogo: false,
 };
