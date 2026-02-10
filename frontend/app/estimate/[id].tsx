@@ -329,7 +329,8 @@ export default function EstimateDetailScreen() {
 
   // Calculate totals
   const subtotal = estimate ? calculateSubtotal(estimate.lineItems) : 0;
-  const taxAmount = settings ? calculateTax(subtotal, settings.taxRate) : 0;
+  const taxRate = estimate?.taxRate || 0;
+  const taxAmount = calculateTax(subtotal, taxRate);
   const grandTotal = calculateGrandTotal(subtotal, taxAmount);
 
   if (loading) {
