@@ -1,138 +1,133 @@
-# DocScanner - Document Scanning & Estimating App
+# Construction Estimator App - PRD
 
 ## Overview
-A production-ready React Native/Expo mobile app for scanning documents, creating estimates/invoices, and generating professional PDFs. Built with local-only storage, no external APIs required.
+A production-ready React Native/Expo mobile app for construction/job estimating with materials catalog, estimates/invoices, tax calculations, PDF export, and Stripe subscription-based Pro tier.
 
 ## Core Features
 
-### 1. Document Capture with Corner Selection
-- **Camera Integration**: Take photos using device camera
-- **Gallery Selection**: Pick existing photos from device
-- **Manual Corner Adjustment**: Drag 4 corner points to define document edges
-- **Perspective Correction**: Crops image to selected bounding box
-- **Base64 Storage**: All images stored as base64 for reliability
+### 1. Materials Catalog (All Users)
+- **Local Material Database**: Name, category, unit, price per unit, notes
+- **Store Links**: Optional URLs to Lowe's, Home Depot, Walmart, etc.
+- **Category Filtering**: Lumber, Drywall, Roofing, Flooring, Plumbing, Electrical, etc.
+- **Search**: Filter by name or category
+- **CRUD Operations**: Add, edit, delete materials
+- **No External APIs**: All prices manually entered by user
 
-### 2. Estimate/Invoice Management
-- **Create Estimates**: Quotes for potential work (EST-0001, EST-0002, etc.)
-- **Create Invoices**: Bills for completed work (INV-0001, INV-0002, etc.)
+### 2. Estimates/Invoices (Free Tier: 5 active, Pro: Unlimited)
+- **Create Estimates**: Quotes for potential work (EST-0001, EST-0002...)
+- **Create Invoices**: Bills for completed work (INV-0001, INV-0002...)
+- **Line Items**: Reference materials or custom items with qty, unit price, notes
+- **Per-Document Tax Rate**: Configurable tax % on each document
 - **Status Tracking**: Draft, Sent, Accepted, Paid
-- **Full CRUD**: Create, read, update, delete documents
+- **Customer Info**: Name, email, phone, address per document
+- **Document Capture**: Camera/gallery with perspective correction
 
-### 3. Customer Information
-- **Customer Details**: Name, email, phone, address
-- **Editable Fields**: Update customer info anytime
-- **No Demo Data**: All customers created by user at runtime
+### 3. Calculations
+- **Line Total**: Quantity × Unit Price
+- **Subtotal**: Sum of all line totals
+- **Tax Amount**: Subtotal × Tax Rate %
+- **Grand Total**: Subtotal + Tax
 
-### 4. Line Items
-- **Description**: What the line item is for
-- **Quantity**: Number of units
-- **Unit Price**: Price per unit
-- **Measurement**: Optional field (e.g., "10 ft x 8 ft")
-- **Notes**: Additional details
-- **Auto-calculation**: Subtotal = Qty × Unit Price
+### 4. Export & Share (All Users)
+- **PDF Generation**: Professional invoices using expo-print
+- **Text Export**: Plain text summary
+- **Share Sheet**: Email, SMS, AirDrop, save to files
+- **Print**: Direct printing via system dialog
 
-### 5. Tax & Totals
-- **Configurable Tax Rate**: Set single percentage in settings
-- **Automatic Calculations**:
-  - Subtotal (sum of line item totals)
-  - Tax Amount (subtotal × tax rate)
-  - Grand Total (subtotal + tax)
+### 5. Business Settings
+- **Company Info**: Name, email, phone, address
+- **Logo Upload**: Pro feature only
+- **Default Tax Rate**: Applied to new documents
 
-### 6. PDF Export & Sharing
-- **Professional PDF Generation**: Using expo-print with HTML templates
-- **Share Sheet Integration**: Email, SMS, save to files
-- **Print Support**: Direct printing via system dialog
-- **Includes**:
-  - Business info header
-  - Customer info
-  - Document image (if captured)
-  - Line items table
-  - Subtotal, tax, and total
-  - Status badge
-
-### 7. Business Settings
-- **Business Name**: Your company name
-- **Contact Info**: Email, phone, address
-- **Tax Rate**: Configurable percentage
-- **Auto-incrementing Numbers**: EST-0001, INV-0001, etc.
+### 6. Subscription (Stripe)
+- **Free Tier**:
+  - Up to 5 active estimates/invoices
+  - Full materials catalog
+  - PDF and text export
+  - Tax calculations
+- **Pro Tier ($9.99/month)**:
+  - Unlimited estimates/invoices
+  - Custom company logo on all exports
+  - Priority support
 
 ## Technical Architecture
 
-### Navigation
-- **Stack Navigator**: expo-router with file-based routing
-- **Home Screen**: `/` - List of all estimates/invoices
-- **Detail Screen**: `/estimate/[id]` - Full editor for each document
-
-### Storage
-- **AsyncStorage**: All data persisted locally on device
-- **Keys**:
-  - `@docscanner_estimates`: Array of all estimates/invoices
-  - `@docscanner_settings`: Business info, tax rate, counters
-
-### Key Files
+### Frontend (React Native + Expo)
 ```
 /app/frontend/
 ├── app/
-│   ├── index.tsx         # Home screen - list view
-│   ├── _layout.tsx       # Stack navigation config
-│   └── estimate/
-│       └── [id].tsx      # Detail/edit screen
+│   ├── index.tsx              # Home - estimates list
+│   ├── _layout.tsx            # Navigation + SubscriptionProvider
+│   ├── paywall.tsx            # Pro upgrade screen
+│   ├── settings.tsx           # Business settings
+│   ├── estimate/
+│   │   └── [id].tsx           # Estimate detail/editor
+│   └── materials/
+│       ├── index.tsx          # Materials catalog list
+│       └── [id].tsx           # Edit material
 ├── src/
-│   ├── types/
-│   │   └── index.ts      # TypeScript interfaces
-│   ├── store/
-│   │   └── storage.ts    # AsyncStorage helpers
+│   ├── types/index.ts         # TypeScript interfaces
+│   ├── store/storage.ts       # AsyncStorage utilities
 │   ├── utils/
-│   │   ├── calculations.ts  # Financial math
-│   │   └── pdfGenerator.ts  # HTML to PDF
+│   │   ├── calculations.ts    # Financial math
+│   │   └── pdfGenerator.ts    # HTML to PDF
+│   ├── SubscriptionContext.tsx # Subscription state
 │   └── components/
 │       ├── CornerSelector.tsx  # Document corner UI
 │       └── LineItemForm.tsx    # Line item editor
 ```
 
-### Dependencies
-- `expo-image-picker` - Camera and gallery access
+### Backend (FastAPI + MongoDB)
+```
+/app/backend/
+└── server.py                  # API endpoints
+    ├── POST /api/customers/create
+    ├── POST /api/subscriptions/create-checkout
+    ├── GET  /api/subscriptions/status/{user_id}
+    ├── POST /api/subscriptions/cancel/{user_id}
+    └── POST /api/webhooks/stripe
+```
+
+### Environment Variables
+```
+# backend/.env
+MONGO_URL=...                      # Auto-configured
+DB_NAME=...                        # Auto-configured
+STRIPE_SECRET_KEY=sk_...           # Required for payments
+STRIPE_WEBHOOK_SECRET=whsec_...    # Required for webhooks
+STRIPE_PRICE_ID=price_...          # Your Pro tier price ID
+```
+
+## Dependencies
+- `expo-image-picker` - Camera/gallery
 - `expo-image-manipulator` - Image cropping
-- `expo-print` - PDF generation from HTML
-- `expo-sharing` - System share sheet
-- `@react-native-async-storage/async-storage` - Local persistence
-- `uuid` - Unique ID generation
+- `expo-print` - PDF generation
+- `expo-sharing` - Share sheet
+- `@stripe/stripe-react-native` - Payments (requires prebuild for full functionality)
+- `@react-native-async-storage/async-storage` - Local storage
+- `uuid` - ID generation
 
-## Production-Ready Quality
+## Stripe Integration Notes
 
-### No Demo Data
+### Development Mode
+When `STRIPE_SECRET_KEY` is not set:
+- API returns mock responses
+- Subscription status defaults to free tier
+- Paywall shows development mode message
+
+### Production Setup
+1. Create Stripe account and product
+2. Create monthly recurring price (Pro tier)
+3. Set environment variables in backend/.env
+4. Configure webhook endpoint in Stripe dashboard
+5. Run `npx expo prebuild` for native Stripe SDK
+
+## No Demo Data Policy
 - App starts completely empty
-- No placeholder customers, invoices, or sample items
+- No placeholder customers, materials, or invoices
 - All content created by user at runtime
 
-### Error Handling
-- Try/catch blocks around all async operations
-- User-friendly error alerts
-- Graceful fallbacks for failed operations
-
-### Data Validation
-- Required fields marked with asterisks
-- Form validation before saving
-- Input sanitization for PDF generation
-
-### Mobile UX Best Practices
-- Touch targets ≥48px
-- Keyboard avoiding views
-- Pull-to-refresh on lists
-- Loading states for async operations
-- Long-press for delete actions
-
-## Constraints Followed
-- No backend server
-- No authentication
-- No external paid APIs
-- No demo/placeholder data
-- Minimal codebase
-- Open-source libraries only
-
-## Future Enhancements
-- Full perspective transform (requires native module)
-- Edge detection using ML Kit (requires prebuild)
-- Multi-currency support
-- Recurring invoices
-- Payment tracking integration
+## Free Tier Limits
+- Max 5 active (non-paid) estimates/invoices
+- No logo upload
+- Paywall shown when limit reached
