@@ -517,9 +517,9 @@ export default function EstimateDetailScreen() {
                 <Text style={styles.totalsLabel}>Subtotal</Text>
                 <Text style={styles.totalsValue}>{formatCurrency(subtotal)}</Text>
               </View>
-              {settings && settings.taxRate > 0 && (
+              {taxRate > 0 && (
                 <View style={styles.totalsRow}>
-                  <Text style={styles.totalsLabel}>Tax ({settings.taxRate}%)</Text>
+                  <Text style={styles.totalsLabel}>Tax ({taxRate}%)</Text>
                   <Text style={styles.totalsValue}>{formatCurrency(taxAmount)}</Text>
                 </View>
               )}
