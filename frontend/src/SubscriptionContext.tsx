@@ -14,8 +14,8 @@ import {
   getSubscriptionStatus,
   saveSubscriptionStatus,
   getActiveEstimatesCount,
-} from '../store/storage';
-import { SubscriptionStatus, AppSettings, FREE_TIER_LIMITS } from '../types';
+} from './store/storage';
+import { SubscriptionStatus, AppSettings, FREE_TIER_LIMITS } from './types';
 
 const API_URL = Constants.expoConfig?.extra?.apiUrl || process.env.EXPO_PUBLIC_BACKEND_URL || '';
 
