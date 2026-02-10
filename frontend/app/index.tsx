@@ -23,7 +23,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Estimate, emptyCustomer, FREE_TIER_LIMITS } from '../src/types';
 import { getEstimates, deleteEstimate, getNextNumber, addEstimate, getSettings, getActiveEstimatesCount } from '../src/store/storage';
 import { calculateSubtotal, calculateTax, calculateGrandTotal, formatCurrency } from '../src/utils/calculations';
-import { useSubscription } from '../src/context/SubscriptionContext';
+import { useSubscription } from '../src/SubscriptionContext';
 
 export default function HomeScreen() {
   const router = useRouter();

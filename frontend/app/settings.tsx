@@ -21,7 +21,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { useSubscription } from '../src/context/SubscriptionContext';
+import { useSubscription } from '../src/SubscriptionContext';
 import { AppSettings } from '../src/types';
 import Constants from 'expo-constants';
 

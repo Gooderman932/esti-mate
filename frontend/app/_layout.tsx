@@ -5,7 +5,7 @@
 import React from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { SubscriptionProvider } from '@/src/context/SubscriptionContext';
+import { SubscriptionProvider } from '../src/SubscriptionContext';
 
 export default function RootLayout() {
   return (

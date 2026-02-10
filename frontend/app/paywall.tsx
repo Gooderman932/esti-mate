@@ -18,7 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
-import { useSubscription } from '../src/context/SubscriptionContext';
+import { useSubscription } from '../src/SubscriptionContext';
 import { FREE_TIER_LIMITS } from '../src/types';
 
 const API_URL = Constants.expoConfig?.extra?.apiUrl || process.env.EXPO_PUBLIC_BACKEND_URL || '';
