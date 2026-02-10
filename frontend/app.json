@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Job Estimator",
+    "name": "DocScanner",
     "slug": "frontend",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -11,8 +11,8 @@
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSCameraUsageDescription": "Take photos to measure job site elements",
-        "NSPhotoLibraryUsageDescription": "Select photos to measure job site elements"
+        "NSCameraUsageDescription": "Scan documents for estimates and invoices",
+        "NSPhotoLibraryUsageDescription": "Select document photos for estimates"
       }
     },
     "android": {
@@ -21,7 +21,11 @@
         "backgroundColor": "#000"
       },
       "edgeToEdgeEnabled": true,
-      "permissions": ["android.permission.CAMERA", "android.permission.READ_EXTERNAL_STORAGE"]
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE"
+      ]
     },
     "web": {
       "bundler": "metro",
