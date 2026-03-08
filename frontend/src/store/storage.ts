@@ -136,7 +136,7 @@ export async function getSettings(): Promise<AppSettings> {
       defaultTaxRate: 0,
       nextEstimateNumber: 1,
       nextInvoiceNumber: 1,
-      userId: uuidv4(),
+      userId: generateId(),
     };
     await saveSettings(defaults);
     return defaults;
@@ -147,7 +147,7 @@ export async function getSettings(): Promise<AppSettings> {
       defaultTaxRate: 0,
       nextEstimateNumber: 1,
       nextInvoiceNumber: 1,
-      userId: uuidv4(),
+      userId: generateId(),
     };
   }
 }
