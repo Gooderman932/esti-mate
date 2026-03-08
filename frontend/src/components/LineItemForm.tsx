@@ -67,7 +67,7 @@ export default function LineItemForm({ item, onSave, onCancel }: LineItemFormPro
     if (!validate()) return;
     
     const lineItem: LineItem = {
-      id: item?.id || uuidv4(),
+      id: item?.id || generateId(),
       description: description.trim(),
       quantity: parseFloat(quantity) || 1,
       unitPrice: parseFloat(unitPrice) || 0,
