@@ -94,7 +94,7 @@ export default function HomeScreen() {
       const appSettings = await getSettings();
       const number = await getNextNumber(type);
       const newEstimate: Estimate = {
-        id: uuidv4(),
+        id: generateId(),
         type,
         number,
         createdAt: new Date().toISOString(),
