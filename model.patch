@@ -1,136 +1,141 @@
-diff --git a/frontend/app/index.tsx b/frontend/app/index.tsx
-index 4f69d33..dbdc32f 100644
---- a/frontend/app/index.tsx
-+++ b/frontend/app/index.tsx
-@@ -19,7 +19,15 @@ import {
- import { SafeAreaView } from 'react-native-safe-area-context';
- import { useFocusEffect, useRouter } from 'expo-router';
- import { Ionicons } from '@expo/vector-icons';
--import { v4 as uuidv4 } from 'uuid';
-+
-+// Simple UUID generator that works in all environments
-+function generateId(): string {
-+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-+    const r = Math.random() * 16 | 0;
-+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-+    return v.toString(16);
-+  });
-+}
- import { Estimate, emptyCustomer, FREE_TIER_LIMITS } from '../src/types';
- import { getEstimates, deleteEstimate, getNextNumber, addEstimate, getSettings, getActiveEstimatesCount } from '../src/store/storage';
- import { calculateSubtotal, calculateTax, calculateGrandTotal, formatCurrency } from '../src/utils/calculations';
-@@ -86,7 +94,7 @@ export default function HomeScreen() {
-       const appSettings = await getSettings();
-       const number = await getNextNumber(type);
-       const newEstimate: Estimate = {
--        id: uuidv4(),
-+        id: generateId(),
-         type,
-         number,
-         createdAt: new Date().toISOString(),
-diff --git a/frontend/app/materials/index.tsx b/frontend/app/materials/index.tsx
-index 1b87b72..0c03157 100644
---- a/frontend/app/materials/index.tsx
-+++ b/frontend/app/materials/index.tsx
-@@ -23,7 +23,15 @@ import {
- import { SafeAreaView } from 'react-native-safe-area-context';
- import { useFocusEffect, useRouter } from 'expo-router';
- import { Ionicons } from '@expo/vector-icons';
--import { v4 as uuidv4 } from 'uuid';
-+
-+// Simple UUID generator that works in all environments
-+function generateId(): string {
-+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-+    const r = Math.random() * 16 | 0;
-+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-+    return v.toString(16);
-+  });
-+}
- import { Material, MATERIAL_CATEGORIES, MATERIAL_UNITS } from '../../src/types';
- import { getMaterials, addMaterial, deleteMaterial } from '../../src/store/storage';
- import { formatCurrency } from '../../src/utils/calculations';
-@@ -85,7 +93,7 @@ export default function MaterialsScreen() {
-     }
- 
-     const newMaterial: Material = {
--      id: uuidv4(),
-+      id: generateId(),
-       name: name.trim(),
-       category,
-       unit,
-diff --git a/frontend/src/components/LineItemForm.tsx b/frontend/src/components/LineItemForm.tsx
-index d7453c6..56da6c9 100644
---- a/frontend/src/components/LineItemForm.tsx
-+++ b/frontend/src/components/LineItemForm.tsx
-@@ -18,7 +18,15 @@ import {
- } from 'react-native';
- import { LineItem } from '../types';
- import { Ionicons } from '@expo/vector-icons';
--import { v4 as uuidv4 } from 'uuid';
-+
-+// Simple UUID generator that works in all environments
-+function generateId(): string {
-+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-+    const r = Math.random() * 16 | 0;
-+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-+    return v.toString(16);
-+  });
-+}
- 
- interface LineItemFormProps {
-   item?: LineItem; // If editing existing item
-@@ -59,7 +67,7 @@ export default function LineItemForm({ item, onSave, onCancel }: LineItemFormPro
-     if (!validate()) return;
-     
-     const lineItem: LineItem = {
--      id: item?.id || uuidv4(),
-+      id: item?.id || generateId(),
-       description: description.trim(),
-       quantity: parseFloat(quantity) || 1,
-       unitPrice: parseFloat(unitPrice) || 0,
-diff --git a/frontend/src/store/storage.ts b/frontend/src/store/storage.ts
-index d3397e8..ec090df 100644
---- a/frontend/src/store/storage.ts
-+++ b/frontend/src/store/storage.ts
-@@ -5,7 +5,6 @@
-  */
- 
- import AsyncStorage from '@react-native-async-storage/async-storage';
--import { v4 as uuidv4 } from 'uuid';
- import {
-   Estimate,
-   Material,
-@@ -14,6 +13,15 @@ import {
-   emptyBusiness,
- } from '../types';
- 
-+// Simple UUID generator that works in all environments
-+function generateId(): string {
-+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-+    const r = Math.random() * 16 | 0;
-+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-+    return v.toString(16);
-+  });
-+}
-+
- // Storage keys
- const KEYS = {
-   ESTIMATES: '@estimator_estimates',
-@@ -128,7 +136,7 @@ export async function getSettings(): Promise<AppSettings> {
-       defaultTaxRate: 0,
-       nextEstimateNumber: 1,
-       nextInvoiceNumber: 1,
--      userId: uuidv4(),
-+      userId: generateId(),
-     };
-     await saveSettings(defaults);
-     return defaults;
-@@ -139,7 +147,7 @@ export async function getSettings(): Promise<AppSettings> {
-       defaultTaxRate: 0,
-       nextEstimateNumber: 1,
-       nextInvoiceNumber: 1,
--      userId: uuidv4(),
-+      userId: generateId(),
-     };
-   }
- }
+diff --git a/model.patch b/model.patch
+index 02fb90d..e69de29 100644
+--- a/model.patch
++++ b/model.patch
+@@ -1,136 +0,0 @@
+-diff --git a/frontend/app/index.tsx b/frontend/app/index.tsx
+-index 4f69d33..dbdc32f 100644
+---- a/frontend/app/index.tsx
+-+++ b/frontend/app/index.tsx
+-@@ -19,7 +19,15 @@ import {
+- import { SafeAreaView } from 'react-native-safe-area-context';
+- import { useFocusEffect, useRouter } from 'expo-router';
+- import { Ionicons } from '@expo/vector-icons';
+--import { v4 as uuidv4 } from 'uuid';
+-+
+-+// Simple UUID generator that works in all environments
+-+function generateId(): string {
+-+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+-+    const r = Math.random() * 16 | 0;
+-+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+-+    return v.toString(16);
+-+  });
+-+}
+- import { Estimate, emptyCustomer, FREE_TIER_LIMITS } from '../src/types';
+- import { getEstimates, deleteEstimate, getNextNumber, addEstimate, getSettings, getActiveEstimatesCount } from '../src/store/storage';
+- import { calculateSubtotal, calculateTax, calculateGrandTotal, formatCurrency } from '../src/utils/calculations';
+-@@ -86,7 +94,7 @@ export default function HomeScreen() {
+-       const appSettings = await getSettings();
+-       const number = await getNextNumber(type);
+-       const newEstimate: Estimate = {
+--        id: uuidv4(),
+-+        id: generateId(),
+-         type,
+-         number,
+-         createdAt: new Date().toISOString(),
+-diff --git a/frontend/app/materials/index.tsx b/frontend/app/materials/index.tsx
+-index 1b87b72..0c03157 100644
+---- a/frontend/app/materials/index.tsx
+-+++ b/frontend/app/materials/index.tsx
+-@@ -23,7 +23,15 @@ import {
+- import { SafeAreaView } from 'react-native-safe-area-context';
+- import { useFocusEffect, useRouter } from 'expo-router';
+- import { Ionicons } from '@expo/vector-icons';
+--import { v4 as uuidv4 } from 'uuid';
+-+
+-+// Simple UUID generator that works in all environments
+-+function generateId(): string {
+-+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+-+    const r = Math.random() * 16 | 0;
+-+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+-+    return v.toString(16);
+-+  });
+-+}
+- import { Material, MATERIAL_CATEGORIES, MATERIAL_UNITS } from '../../src/types';
+- import { getMaterials, addMaterial, deleteMaterial } from '../../src/store/storage';
+- import { formatCurrency } from '../../src/utils/calculations';
+-@@ -85,7 +93,7 @@ export default function MaterialsScreen() {
+-     }
+- 
+-     const newMaterial: Material = {
+--      id: uuidv4(),
+-+      id: generateId(),
+-       name: name.trim(),
+-       category,
+-       unit,
+-diff --git a/frontend/src/components/LineItemForm.tsx b/frontend/src/components/LineItemForm.tsx
+-index d7453c6..56da6c9 100644
+---- a/frontend/src/components/LineItemForm.tsx
+-+++ b/frontend/src/components/LineItemForm.tsx
+-@@ -18,7 +18,15 @@ import {
+- } from 'react-native';
+- import { LineItem } from '../types';
+- import { Ionicons } from '@expo/vector-icons';
+--import { v4 as uuidv4 } from 'uuid';
+-+
+-+// Simple UUID generator that works in all environments
+-+function generateId(): string {
+-+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+-+    const r = Math.random() * 16 | 0;
+-+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+-+    return v.toString(16);
+-+  });
+-+}
+- 
+- interface LineItemFormProps {
+-   item?: LineItem; // If editing existing item
+-@@ -59,7 +67,7 @@ export default function LineItemForm({ item, onSave, onCancel }: LineItemFormPro
+-     if (!validate()) return;
+-     
+-     const lineItem: LineItem = {
+--      id: item?.id || uuidv4(),
+-+      id: item?.id || generateId(),
+-       description: description.trim(),
+-       quantity: parseFloat(quantity) || 1,
+-       unitPrice: parseFloat(unitPrice) || 0,
+-diff --git a/frontend/src/store/storage.ts b/frontend/src/store/storage.ts
+-index d3397e8..ec090df 100644
+---- a/frontend/src/store/storage.ts
+-+++ b/frontend/src/store/storage.ts
+-@@ -5,7 +5,6 @@
+-  */
+- 
+- import AsyncStorage from '@react-native-async-storage/async-storage';
+--import { v4 as uuidv4 } from 'uuid';
+- import {
+-   Estimate,
+-   Material,
+-@@ -14,6 +13,15 @@ import {
+-   emptyBusiness,
+- } from '../types';
+- 
+-+// Simple UUID generator that works in all environments
+-+function generateId(): string {
+-+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+-+    const r = Math.random() * 16 | 0;
+-+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+-+    return v.toString(16);
+-+  });
+-+}
+-+
+- // Storage keys
+- const KEYS = {
+-   ESTIMATES: '@estimator_estimates',
+-@@ -128,7 +136,7 @@ export async function getSettings(): Promise<AppSettings> {
+-       defaultTaxRate: 0,
+-       nextEstimateNumber: 1,
+-       nextInvoiceNumber: 1,
+--      userId: uuidv4(),
+-+      userId: generateId(),
+-     };
+-     await saveSettings(defaults);
+-     return defaults;
+-@@ -139,7 +147,7 @@ export async function getSettings(): Promise<AppSettings> {
+-       defaultTaxRate: 0,
+-       nextEstimateNumber: 1,
+-       nextInvoiceNumber: 1,
+--      userId: uuidv4(),
+-+      userId: generateId(),
+-     };
+-   }
+- }
