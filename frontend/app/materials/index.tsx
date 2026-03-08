@@ -93,7 +93,7 @@ export default function MaterialsScreen() {
     }
 
     const newMaterial: Material = {
-      id: uuidv4(),
+      id: generateId(),
       name: name.trim(),
       category,
       unit,
