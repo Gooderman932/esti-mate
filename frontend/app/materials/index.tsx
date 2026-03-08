@@ -23,7 +23,15 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import { v4 as uuidv4 } from 'uuid';
+
+// Simple UUID generator that works in all environments
+function generateId(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+    const r = Math.random() * 16 | 0;
+    const v = c === 'x' ? r : (r & 0x3 | 0x8);
+    return v.toString(16);
+  });
+}
 import { Material, MATERIAL_CATEGORIES, MATERIAL_UNITS } from '../../src/types';
 import { getMaterials, addMaterial, deleteMaterial } from '../../src/store/storage';
 import { formatCurrency } from '../../src/utils/calculations';
