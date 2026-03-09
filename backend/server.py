@@ -189,12 +189,6 @@ async def create_subscription_checkout(request: CreateCheckoutRequest):
             "session_id": checkout_session.id,
             "status": "created"
         }
-        
-        return {
-            "subscription_id": subscription.id,
-            "client_secret": client_secret,
-            "status": subscription.status
-        }
     except stripe.error.StripeError as e:
         logger.error(f"Stripe error creating subscription: {e}")
         raise HTTPException(status_code=400, detail=str(e))
