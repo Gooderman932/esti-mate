@@ -154,7 +154,7 @@ async def create_customer(request: CreateCustomerRequest):
 
 @api_router.post("/subscriptions/create-checkout")
 async def create_subscription_checkout(request: CreateCheckoutRequest):
-    """Create a subscription checkout session and return client secret"""
+    """Create a Stripe Checkout Session for subscription"""
     try:
         # Get customer
         customer = await db.customers.find_one({"user_id": request.user_id})
@@ -163,40 +163,32 @@ async def create_subscription_checkout(request: CreateCheckoutRequest):
         
         # Check if Stripe is configured
         if not stripe.api_key:
-            # Return mock response for development
             return {
-                "subscription_id": f"sub_mock_{uuid.uuid4().hex[:8]}",
-                "client_secret": f"pi_mock_secret_{uuid.uuid4().hex[:16]}",
-                "status": "incomplete",
-                "mock": True,
+                "checkout_url": None,
+                "status": "mock",
                 "message": "Stripe not configured. Set STRIPE_SECRET_KEY in backend/.env"
             }
         
-        # Create subscription with incomplete status
-        subscription = stripe.Subscription.create(
+        # Create Checkout Session for subscription
+        checkout_session = stripe.checkout.Session.create(
             customer=customer["stripe_customer_id"],
-            items=[{"price": STRIPE_PRICE_ID}],
-            payment_behavior="default_incomplete",
-            payment_settings={
-                "save_default_payment_method": "on_subscription"
-            },
-            expand=["latest_invoice.payment_intent"]
+            mode="subscription",
+            line_items=[{
+                "price": STRIPE_PRICE_ID,
+                "quantity": 1,
+            }],
+            success_url="https://measure-mate-21.preview.emergentagent.com/?success=true",
+            cancel_url="https://measure-mate-21.preview.emergentagent.com/?canceled=true",
+            metadata={"user_id": request.user_id},
         )
         
-        # Store subscription in MongoDB
-        db_subscription = Subscription(
-            user_id=request.user_id,
-            stripe_subscription_id=subscription.id,
-            stripe_customer_id=customer["stripe_customer_id"],
-            price_id=STRIPE_PRICE_ID,
-            status=subscription.status
-        )
-        await db.subscriptions.insert_one(db_subscription.dict())
+        logger.info(f"Created checkout session for user {request.user_id}")
         
-        # Get client secret for payment
-        client_secret = subscription.latest_invoice.payment_intent.client_secret
-        
-        logger.info(f"Created subscription checkout for user {request.user_id}")
+        return {
+            "checkout_url": checkout_session.url,
+            "session_id": checkout_session.id,
+            "status": "created"
+        }
         
         return {
             "subscription_id": subscription.id,
