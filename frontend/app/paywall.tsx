@@ -13,6 +13,7 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -46,38 +47,30 @@ export default function PaywallScreen() {
 
       const data = await response.json();
 
-      if (data.mock) {
-        // Development mode - simulate success
-        Alert.alert(
-          'Development Mode',
-          'Stripe is not configured. In production, this would open the payment sheet.\n\nTo enable Stripe:\n1. Set STRIPE_SECRET_KEY in backend/.env\n2. Set STRIPE_PRICE_ID to your Pro tier price ID\n3. Restart the backend',
-          [{ text: 'OK' }]
-        );
-      } else if (data.client_secret) {
-        // Production mode - would normally use Stripe Payment Sheet here
-        // For now, show info about the integration
-        Alert.alert(
-          'Payment Ready',
-          'Stripe checkout session created. In a production build with expo prebuild, this would launch the native Stripe Payment Sheet.',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            {
-              text: 'Simulate Success',
-              onPress: async () => {
-                // In real implementation, this happens after payment sheet confirms
-                await checkSubscription();
-                router.back();
-              },
-            },
-          ]
-        );
+      if (data.checkout_url) {
+        // Open Stripe Checkout in browser
+        const supported = await Linking.canOpenURL(data.checkout_url);
+        if (supported) {
+          await Linking.openURL(data.checkout_url);
+          // After returning from checkout, refresh subscription status
+          setTimeout(() => {
+            checkSubscription();
+          }, 2000);
+        } else {
+          Alert.alert('Error', 'Cannot open checkout URL');
+        }
+      } else if (data.detail) {
+        Alert.alert('Error', data.detail);
       } else {
-        throw new Error(data.detail || 'Failed to create checkout');
+        throw new Error('Failed to create checkout');
       }
     } catch (error) {
       console.error('Subscription error:', error);
       Alert.alert('Error', 'Failed to start subscription. Please try again.');
     } finally {
+      setLoading(false);
+    }
+  };
       setLoading(false);
     }
   };
