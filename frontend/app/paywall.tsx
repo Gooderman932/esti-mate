@@ -71,9 +71,6 @@ export default function PaywallScreen() {
       setLoading(false);
     }
   };
-      setLoading(false);
-    }
-  };
 
   const handleRestorePurchase = async () => {
     try {
