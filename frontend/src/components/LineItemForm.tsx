@@ -3,6 +3,7 @@
  * 
  * Form for adding/editing a single line item with description,
  * quantity, unit price, measurement, and notes.
+ * Includes Auto Measure button for camera-based measurements.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -16,8 +17,11 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
+import { useRouter } from 'expo-router';
 import { LineItem } from '../types';
 import { Ionicons } from '@expo/vector-icons';
+import { useMeasureContext } from '../contexts/MeasureContext';
+import { formatDistance } from '../utils/pinholeCamera';
 
 // Simple UUID generator that works in all environments
 function generateId(): string {
@@ -35,12 +39,29 @@ interface LineItemFormProps {
 }
 
 export default function LineItemForm({ item, onSave, onCancel }: LineItemFormProps) {
+  const router = useRouter();
+  const { measurements, unitSystem, isCalibrated } = useMeasureContext();
+  
   const [description, setDescription] = useState(item?.description || '');
   const [quantity, setQuantity] = useState(item?.quantity?.toString() || '1');
   const [unitPrice, setUnitPrice] = useState(item?.unitPrice?.toString() || '');
   const [measurement, setMeasurement] = useState(item?.measurement || '');
   const [notes, setNotes] = useState(item?.notes || '');
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
+
+  // Watch for new measurements and auto-fill
+  useEffect(() => {
+    if (measurements.length > 0) {
+      const latest = measurements[0];
+      // Check if this is a recent measurement (within last 30 seconds)
+      const measureTime = new Date(latest.timestamp).getTime();
+      const now = Date.now();
+      if (now - measureTime < 30000) {
+        const formattedMeasure = formatDistance(latest.distance, latest.unit);
+        setMeasurement(formattedMeasure);
+      }
+    }
+  }, [measurements]);
 
   const validate = (): boolean => {
     const newErrors: { [key: string]: string } = {};
@@ -76,6 +97,10 @@ export default function LineItemForm({ item, onSave, onCancel }: LineItemFormPro
     };
     
     onSave(lineItem);
+  };
+
+  const handleAutoMeasure = () => {
+    router.push('/auto-measure');
   };
 
   return (
@@ -140,7 +165,13 @@ export default function LineItemForm({ item, onSave, onCancel }: LineItemFormPro
           </View>
 
           <View style={styles.field}>
-            <Text style={styles.label}>Measurement (optional)</Text>
+            <View style={styles.measurementHeader}>
+              <Text style={styles.label}>Measurement (optional)</Text>
+              <TouchableOpacity style={styles.autoMeasureButton} onPress={handleAutoMeasure}>
+                <Ionicons name="camera" size={16} color="#007AFF" />
+                <Text style={styles.autoMeasureText}>Auto Measure</Text>
+              </TouchableOpacity>
+            </View>
             <TextInput
               style={styles.input}
               value={measurement}
@@ -148,6 +179,11 @@ export default function LineItemForm({ item, onSave, onCancel }: LineItemFormPro
               placeholder="e.g., 10 ft x 8 ft"
               placeholderTextColor="#999"
             />
+            {!isCalibrated && (
+              <Text style={styles.calibrationHint}>
+                Tip: Calibrate Auto Measure for accurate results
+              </Text>
+            )}
           </View>
 
           <View style={styles.field}>
@@ -237,6 +273,31 @@ const styles = StyleSheet.create({
   errorText: {
     color: '#FF3B30',
     fontSize: 12,
+    marginTop: 4,
+  },
+  measurementHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  autoMeasureButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#E3F2FD',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    gap: 4,
+  },
+  autoMeasureText: {
+    color: '#007AFF',
+    fontSize: 13,
+    fontWeight: '500',
+  },
+  calibrationHint: {
+    color: '#FF9500',
+    fontSize: 11,
     marginTop: 4,
   },
   saveButton: {
