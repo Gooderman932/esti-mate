@@ -177,8 +177,8 @@ async def create_subscription_checkout(request: CreateCheckoutRequest):
                 "price": STRIPE_PRICE_ID,
                 "quantity": 1,
             }],
-            success_url="https://measure-mate-21.preview.emergentagent.com/?success=true",
-            cancel_url="https://measure-mate-21.preview.emergentagent.com/?canceled=true",
+            success_url="https://measure-build-3.preview.emergentagent.com/?success=true",
+            cancel_url="https://measure-build-3.preview.emergentagent.com/?canceled=true",
             metadata={"user_id": request.user_id},
         )
         

@@ -261,19 +261,82 @@ frontend:
         agent: "main"
         comment: "Estimate status dropdown with Draft, Sent, Accepted, Paid options. Color-coded badges."
 
+  - task: "PixelMeasure - Auto Measure Button in LineItemForm"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/components/LineItemForm.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Auto Measure button exists in LineItemForm and navigates to /auto-measure route. useEffect watches measurements context and auto-fills measurement field within 30 seconds of measurement."
+
+  - task: "PixelMeasure - Auto Measure Camera Screen"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/auto-measure.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Full camera measurement screen with tap-to-mark points, pixel distance calculation, calibration modal, and result modal. Adds measurements to MeasureContext. On Save & Use, calls router.back() to return to estimate."
+
+  - task: "PixelMeasure - Measure Settings Screen"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/measure-settings.tsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Settings screen for unit system (metric/imperial), calibration profiles management, and camera overlay options (grid/guides). Accessible from Auto Measure screen settings icon."
+
+  - task: "PixelMeasure - Measurement History Screen"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/app/measure-history.tsx"
+    stuck_count: 0
+    priority: "medium"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "History screen showing all saved measurements with sort by date or distance, export as CSV, and delete options."
+
+  - task: "PixelMeasure - MeasureContext State Management"
+    implemented: true
+    working: "NA"
+    file: "/app/frontend/src/contexts/MeasureContext.tsx"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Full context with calibration profiles, measurements, unit system, grid/guides settings. Persists to AsyncStorage. MeasureProvider wraps app in _layout.tsx."
+
 metadata:
   created_by: "main_agent"
-  version: "2.0"
-  test_sequence: 1
-  run_ui: false
+  version: "3.0"
+  test_sequence: 2
+  run_ui: true
 
 test_plan:
   current_focus:
-    - "All features implemented and verified via screenshots"
+    - "PixelMeasure - Auto Measure Button in LineItemForm"
+    - "PixelMeasure - Auto Measure Camera Screen"
+    - "PixelMeasure - Measure Settings Screen"
+    - "PixelMeasure - Measurement History Screen"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
 
 agent_communication:
   - agent: "main"
-    message: "Production-ready DocScanner app implemented with all requested features. Camera/gallery capture, corner selection, line items, tax calculations, PDF export, and sharing all working. Verified through multiple Playwright screenshots. Note: AsyncStorage data may not persist in web preview between page reloads - this is expected and works correctly on actual mobile device via Expo Go."
+    message: "PixelMeasure integration is complete with all infrastructure in place. Tasks needing test: 1) Auto Measure button visible in LineItemForm (inside estimate line items modal), 2) Navigating to /auto-measure route works, 3) Camera permission screen shows on web (no actual camera available), 4) Measure settings (/measure-settings) shows unit system and calibration UI, 5) Measure history (/measure-history) shows empty state. The complete flow: user opens line item form -> taps Auto Measure -> goes to camera screen -> marks two points -> measures -> saves to context -> taps Use This Value -> returns to form -> measurement auto-fills. NOTE: On web preview camera won't work but UI/navigation should be verifiable. Test on actual device via QR code for full camera functionality."
