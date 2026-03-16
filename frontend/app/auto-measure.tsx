@@ -223,6 +223,13 @@ export default function AutoMeasureScreen() {
   if (!permission.granted) {
     return (
       <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity onPress={() => router.back()} style={styles.headerButton}>
+            <Ionicons name="arrow-back" size={24} color="#fff" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Auto Measure</Text>
+          <View style={styles.headerButton} />
+        </View>
         <View style={styles.permissionContainer}>
           <Ionicons name="camera-outline" size={64} color="#666" />
           <Text style={styles.permissionText}>Camera permission is required for measurements</Text>

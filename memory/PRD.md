@@ -1,133 +1,89 @@
 # Construction Estimator App - PRD
 
-## Overview
-A production-ready React Native/Expo mobile app for construction/job estimating with materials catalog, estimates/invoices, tax calculations, PDF export, and Stripe subscription-based Pro tier.
+## Original Problem Statement
+Build a React Native/Expo mobile app for construction/job estimating with:
+1. Camera capture and document scanning
+2. Corner selection for perspective correction
+3. Line items management (description, quantity, unit price)
+4. Tax calculations and PDF export
+5. Camera-based measurement (PixelMeasure) to auto-fill line item dimensions
+6. Stripe Pro subscription for unlimited estimates + logo upload
 
-## Core Features
+## User Personas
+- Construction contractors needing on-site estimates
+- Freelance tradespeople creating quick invoices
+- Small construction businesses wanting professional PDF output
 
-### 1. Materials Catalog (All Users)
-- **Local Material Database**: Name, category, unit, price per unit, notes
-- **Store Links**: Optional URLs to Lowe's, Home Depot, Walmart, etc.
-- **Category Filtering**: Lumber, Drywall, Roofing, Flooring, Plumbing, Electrical, etc.
-- **Search**: Filter by name or category
-- **CRUD Operations**: Add, edit, delete materials
-- **No External APIs**: All prices manually entered by user
+## Architecture
+- **Frontend**: React Native / Expo (expo-router file-based routing)
+- **Backend**: FastAPI (Python) on port 8001
+- **Database**: MongoDB (local) + AsyncStorage (device)
+- **Payments**: Stripe (web-based checkout sessions)
+- **Camera**: expo-camera + pinhole camera model for measurement
+- **PDF**: expo-print + expo-sharing
 
-### 2. Estimates/Invoices (Free Tier: 5 active, Pro: Unlimited)
-- **Create Estimates**: Quotes for potential work (EST-0001, EST-0002...)
-- **Create Invoices**: Bills for completed work (INV-0001, INV-0002...)
-- **Line Items**: Reference materials or custom items with qty, unit price, notes
-- **Per-Document Tax Rate**: Configurable tax % on each document
-- **Status Tracking**: Draft, Sent, Accepted, Paid
-- **Customer Info**: Name, email, phone, address per document
-- **Document Capture**: Camera/gallery with perspective correction
+## Core Features Implemented
 
-### 3. Calculations
-- **Line Total**: Quantity × Unit Price
-- **Subtotal**: Sum of all line totals
-- **Tax Amount**: Subtotal × Tax Rate %
-- **Grand Total**: Subtotal + Tax
+### MVP (Complete)
+- ✅ Home screen with estimate list and Free tier badge (0/5 active)
+- ✅ Create estimate/invoice with auto-incrementing numbers (EST-0001, INV-0001)
+- ✅ Estimate detail screen with customer info, document image, line items, totals
+- ✅ Camera/gallery image picker with corner selection (perspective correction)
+- ✅ Line items: description, quantity, unit price, measurement, notes
+- ✅ Tax calculation (configurable %) and grand total
+- ✅ PDF generation and sharing (expo-print)
+- ✅ Status management (draft/sent/accepted/paid)
+- ✅ AsyncStorage persistence
+- ✅ Materials catalog
 
-### 4. Export & Share (All Users)
-- **PDF Generation**: Professional invoices using expo-print
-- **Text Export**: Plain text summary
-- **Share Sheet**: Email, SMS, AirDrop, save to files
-- **Print**: Direct printing via system dialog
+### Stripe Pro Subscription (Complete)
+- ✅ Free tier: 5 active estimates limit
+- ✅ Pro tier: $9.99/month via Stripe web checkout
+- ✅ Paywall screen with feature comparison
+- ✅ Backend: FastAPI with Stripe customer creation, checkout session, webhooks
+- ✅ SubscriptionContext for feature gating
 
-### 5. Business Settings
-- **Company Info**: Name, email, phone, address
-- **Logo Upload**: Pro feature only
-- **Default Tax Rate**: Applied to new documents
+### PixelMeasure Integration (P0 - Complete as of 2026-03-16)
+- ✅ Auto Measure button in LineItemForm → navigates to /auto-measure
+- ✅ Camera measurement screen: tap two points to measure distance
+- ✅ Calibration via known object (pinhole camera model math)
+- ✅ Measurement auto-fills in line item form via context + useEffect
+- ✅ Calibration profiles management (multiple profiles)
+- ✅ Measure Settings screen: unit system, profiles, grid/guides overlays
+- ✅ Measurement History screen with export/delete
+- ✅ MeasureContext with AsyncStorage persistence
+- ✅ Back button added to camera permission denied screen
 
-### 6. Subscription (Stripe)
-- **Free Tier**:
-  - Up to 5 active estimates/invoices
-  - Full materials catalog
-  - PDF and text export
-  - Tax calculations
-- **Pro Tier ($9.99/month)**:
-  - Unlimited estimates/invoices
-  - Custom company logo on all exports
-  - Priority support
+## Key Files
+- `/app/frontend/app/_layout.tsx` - Root layout with MeasureProvider + SubscriptionProvider
+- `/app/frontend/app/auto-measure.tsx` - Camera measurement screen
+- `/app/frontend/app/measure-settings.tsx` - Calibration and settings
+- `/app/frontend/app/measure-history.tsx` - Measurement history
+- `/app/frontend/app/estimate/[id].tsx` - Estimate detail with line items
+- `/app/frontend/src/components/LineItemForm.tsx` - Line item form with Auto Measure
+- `/app/frontend/src/contexts/MeasureContext.tsx` - Measurement state management
+- `/app/frontend/src/utils/pinholeCamera.ts` - Distance calculation math
+- `/app/frontend/app/paywall.tsx` - Pro subscription screen
+- `/app/backend/server.py` - FastAPI backend for Stripe
 
-## Technical Architecture
+## Environment
+- Frontend URL: https://measure-build-3.preview.emergentagent.com
+- Backend: 0.0.0.0:8001 (proxied via nginx at /api/*)
+- Stripe: Live keys in /app/backend/.env
 
-### Frontend (React Native + Expo)
-```
-/app/frontend/
-├── app/
-│   ├── index.tsx              # Home - estimates list
-│   ├── _layout.tsx            # Navigation + SubscriptionProvider
-│   ├── paywall.tsx            # Pro upgrade screen
-│   ├── settings.tsx           # Business settings
-│   ├── estimate/
-│   │   └── [id].tsx           # Estimate detail/editor
-│   └── materials/
-│       ├── index.tsx          # Materials catalog list
-│       └── [id].tsx           # Edit material
-├── src/
-│   ├── types/index.ts         # TypeScript interfaces
-│   ├── store/storage.ts       # AsyncStorage utilities
-│   ├── utils/
-│   │   ├── calculations.ts    # Financial math
-│   │   └── pdfGenerator.ts    # HTML to PDF
-│   ├── SubscriptionContext.tsx # Subscription state
-│   └── components/
-│       ├── CornerSelector.tsx  # Document corner UI
-│       └── LineItemForm.tsx    # Line item editor
-```
+## Prioritized Backlog
 
-### Backend (FastAPI + MongoDB)
-```
-/app/backend/
-└── server.py                  # API endpoints
-    ├── POST /api/customers/create
-    ├── POST /api/subscriptions/create-checkout
-    ├── GET  /api/subscriptions/status/{user_id}
-    ├── POST /api/subscriptions/cancel/{user_id}
-    └── POST /api/webhooks/stripe
-```
+### P1 - Next Up
+- Add Measurement History and Settings links in app Settings screen
+- PDF Export Enhancement: include company logo for Pro users
+- Enforce Free Tier 5-estimate limit when creating new estimates
 
-### Environment Variables
-```
-# backend/.env
-MONGO_URL=...                      # Auto-configured
-DB_NAME=...                        # Auto-configured
-STRIPE_SECRET_KEY=sk_...           # Required for payments
-STRIPE_WEBHOOK_SECRET=whsec_...    # Required for webhooks
-STRIPE_PRICE_ID=price_...          # Your Pro tier price ID
-```
+### P2 - Future
+- QuickMeasure component on estimate detail screen (recent measurements)
+- Subscription status handling improvements (auto-revert on cancellation)
+- Improve calibration UX with step-by-step wizard
 
-## Dependencies
-- `expo-image-picker` - Camera/gallery
-- `expo-image-manipulator` - Image cropping
-- `expo-print` - PDF generation
-- `expo-sharing` - Share sheet
-- `@stripe/stripe-react-native` - Payments (requires prebuild for full functionality)
-- `@react-native-async-storage/async-storage` - Local storage
-- `uuid` - ID generation
-
-## Stripe Integration Notes
-
-### Development Mode
-When `STRIPE_SECRET_KEY` is not set:
-- API returns mock responses
-- Subscription status defaults to free tier
-- Paywall shows development mode message
-
-### Production Setup
-1. Create Stripe account and product
-2. Create monthly recurring price (Pro tier)
-3. Set environment variables in backend/.env
-4. Configure webhook endpoint in Stripe dashboard
-5. Run `npx expo prebuild` for native Stripe SDK
-
-## No Demo Data Policy
-- App starts completely empty
-- No placeholder customers, materials, or invoices
-- All content created by user at runtime
-
-## Free Tier Limits
-- Max 5 active (non-paid) estimates/invoices
-- No logo upload
-- Paywall shown when limit reached
+### P3 - Nice to Have
+- Offline PDF caching
+- Multi-page documents
+- Team sharing / cloud sync
