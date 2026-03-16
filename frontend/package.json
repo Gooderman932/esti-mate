@@ -23,6 +23,7 @@
     "@stripe/stripe-react-native": "0.50.3",
     "expo": "54.0.33",
     "expo-blur": "~15.0.8",
+    "expo-camera": "^55.0.9",
     "expo-constants": "~18.0.13",
     "expo-file-system": "^19.0.21",
     "expo-font": "~14.0.11",
