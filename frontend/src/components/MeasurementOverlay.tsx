@@ -35,7 +35,7 @@ import {
 const HANDLE_SIZE = 24;
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-interface MeasurementOverlayProps {
+interface ⁹iMeasurementOverlayProps {
   imageUri: string;
   imageWidth: number;
   imageHeight: number;
