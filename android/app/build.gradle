@@ -1,0 +1,75 @@
+apply plugin: 'com.android.application'
+
+// If you are not actually using keystore.properties, you can remove this whole block.
+// Leaving it here is harmless as long as the file check is guarded.
+def keystorePropertiesFile = new File(rootDir.parentFile, "keystore.properties")
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
+android {
+    namespace "com.poordudeholdings.estimatemobile"
+    compileSdkVersion 35
+
+    defaultConfig {
+        applicationId "com.poordudeholdings.estimatemobile"
+        minSdkVersion 22
+        targetSdkVersion 35
+        versionCode 17
+        versionName "1.1.0"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+
+        aaptOptions {
+            // Add any options you previously used here, if needed
+        }
+    }
+
+    signingConfigs {
+        release {
+            storeFile file("/home/matthew/esti-mate-keystore.jks")
+            storePassword "12345Preston!"
+            keyAlias "esti-mate"
+            keyPassword "12345Preston!"
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled false
+            shrinkResources false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+        debug {
+            // Debug-specific config if needed
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
+
+dependencies {
+    implementation fileTree(dir: "libs", include: ["*.jar"])
+
+    // Capacitor core
+    implementation project(':capacitor-android')
+    implementation project(':capacitor-cordova-android-plugins')
+
+    // AndroidX + Material
+    implementation 'androidx.core:core-ktx:1.12.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.11.0'
+    implementation 'androidx.constraintlayout:constraintlayout:2.1.4'
+
+    // Tests
+    testImplementation 'junit:junit:4.13.2'
+    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+
+    // If you had any other dependencies earlier (React Native, extra Capacitor plugins, etc.),
+    // re-add them here below this comment.
+}
