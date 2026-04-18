@@ -1,67 +1,70 @@
-import Purchases, {
-  LOG_LEVEL,
-  type PurchasesPackage,
-  type CustomerInfo,
-} from 'react-native-purchases';
-import { ENTITLEMENTS, SubscriptionTier } from './subscriptionConfig';
+import {
+  initConnection,
+  endConnection,
+  getSubscriptions,
+  requestSubscription,
+  getAvailablePurchases,
+  finishTransaction,
+  type SubscriptionAndroid,
+  type Purchase,
+} from 'react-native-iap';
+import { PRODUCT_IDS, SubscriptionTier } from './subscriptionConfig';
 
-const ANDROID_KEY = process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY ?? '';
+const SKU_LIST = [PRODUCT_IDS.PRO, PRODUCT_IDS.ENTERPRISE];
 
-export function initPurchases(userId?: string): void {
-  if (!ANDROID_KEY) {
-    console.warn('[RevenueCat] EXPO_PUBLIC_REVENUECAT_ANDROID_KEY not set — billing disabled');
-    return;
-  }
-  Purchases.setLogLevel(__DEV__ ? LOG_LEVEL.VERBOSE : LOG_LEVEL.ERROR);
-  Purchases.configure({
-    apiKey: ANDROID_KEY,
-    appUserID: userId ?? null,
-  });
-}
-
-export async function getOfferings(): Promise<PurchasesPackage[]> {
-  if (!ANDROID_KEY) return [];
+export async function initBilling(): Promise<void> {
   try {
-    const offerings = await Purchases.getOfferings();
-    return offerings.current?.availablePackages ?? [];
+    await initConnection();
   } catch (e) {
-    console.error('[RevenueCat] getOfferings failed:', e);
-    return [];
+    console.error('[Billing] initConnection failed:', e);
   }
 }
 
-export async function purchasePackage(pkg: PurchasesPackage): Promise<CustomerInfo> {
-  const { customerInfo } = await Purchases.purchasePackage(pkg);
-  return customerInfo;
-}
-
-export async function restorePurchases(): Promise<CustomerInfo> {
-  return Purchases.restorePurchases();
-}
-
-export async function getCustomerInfo(): Promise<CustomerInfo | null> {
-  if (!ANDROID_KEY) return null;
+export async function endBilling(): Promise<void> {
   try {
-    return await Purchases.getCustomerInfo();
-  } catch (e) {
-    console.error('[RevenueCat] getCustomerInfo failed:', e);
-    return null;
-  }
+    await endConnection();
+  } catch {}
 }
 
-export async function getSubscriptionTier(): Promise<SubscriptionTier> {
-  const info = await getCustomerInfo();
-  if (!info) return 'free';
-  if (info.entitlements.active[ENTITLEMENTS.ENTERPRISE]) return 'enterprise';
-  if (info.entitlements.active[ENTITLEMENTS.PRO]) return 'pro';
-  return 'free';
-}
-
-export async function logOutRevenueCat(): Promise<void> {
-  if (!ANDROID_KEY) return;
+export async function purchaseSubscription(sku: string): Promise<boolean> {
   try {
-    await Purchases.logOut();
-  } catch (e) {
-    console.error('[RevenueCat] logOut failed:', e);
+    const subs = await getSubscriptions({ skus: [sku] });
+    const sub = subs[0] as SubscriptionAndroid | undefined;
+    const offerToken = sub?.subscriptionOfferDetails?.[0]?.offerToken;
+
+    const purchase = await requestSubscription({
+      sku,
+      ...(offerToken ? { subscriptionOffers: [{ sku, offerToken }] } : {}),
+    });
+
+    if (purchase) {
+      const p = Array.isArray(purchase) ? purchase[0] : purchase;
+      await finishTransaction({ purchase: p as Purchase, isConsumable: false });
+    }
+    return true;
+  } catch (e: unknown) {
+    const err = e as { code?: string };
+    if (err.code !== 'E_USER_CANCELLED') {
+      console.error('[Billing] purchaseSubscription failed:', e);
+    }
+    return false;
   }
+}
+
+export async function getCurrentTier(): Promise<SubscriptionTier> {
+  try {
+    const purchases = await getAvailablePurchases();
+    const hasEnterprise = purchases.some(p => p.productId === PRODUCT_IDS.ENTERPRISE);
+    if (hasEnterprise) return 'enterprise';
+    const hasPro = purchases.some(p => p.productId === PRODUCT_IDS.PRO);
+    if (hasPro) return 'pro';
+    return 'free';
+  } catch (e) {
+    console.error('[Billing] getAvailablePurchases failed:', e);
+    return 'free';
+  }
+}
+
+export async function restorePurchases(): Promise<SubscriptionTier> {
+  return getCurrentTier();
 }

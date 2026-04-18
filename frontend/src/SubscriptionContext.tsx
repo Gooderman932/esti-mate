@@ -7,11 +7,9 @@ import React, {
   useRef,
 } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
-import type { PurchasesPackage } from 'react-native-purchases';
 import {
-  getSubscriptionTier,
-  getOfferings,
-  purchasePackage,
+  getCurrentTier,
+  purchaseSubscription,
   restorePurchases,
 } from './lib/purchases';
 import {
@@ -50,9 +48,8 @@ interface SubscriptionContextType {
   checkSubscription: () => Promise<void>;
   canUploadLogo: boolean;
 
-  // Offerings & purchase
-  offerings: PurchasesPackage[];
-  purchase: (pkg: PurchasesPackage) => Promise<boolean>;
+  // Purchase & restore
+  purchase: (sku: string) => Promise<boolean>;
   restore: () => Promise<boolean>;
   refresh: () => Promise<void>;
 
@@ -74,7 +71,6 @@ interface SubscriptionContextType {
   monthlyUsage: { estimates: number; invoices: number };
   resetDate: string;
 
-  // Increment usage (call right before creating a document)
   incrementEstimateUsage: () => Promise<void>;
   incrementInvoiceUsage: () => Promise<void>;
 }
@@ -85,7 +81,6 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   const [tier, setTier] = useState<SubscriptionTier>('free');
   const [isLoading, setIsLoading] = useState(true);
   const [settings, setSettings] = useState<AppSettings | null>(null);
-  const [offerings, setOfferings] = useState<PurchasesPackage[]>([]);
   const [usage, setUsage] = useState({ estimates: 0, invoices: 0 });
   const appStateRef = useRef(AppState.currentState);
 
@@ -94,10 +89,9 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     setUsage({ estimates: u.estimates, invoices: u.invoices });
   }, []);
 
-  const loadTierAndOfferings = useCallback(async () => {
-    const [t, pkgs] = await Promise.all([getSubscriptionTier(), getOfferings()]);
+  const loadTier = useCallback(async () => {
+    const t = await getCurrentTier();
     setTier(t);
-    setOfferings(pkgs);
   }, []);
 
   const loadSettings = useCallback(async () => {
@@ -106,9 +100,9 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   }, []);
 
   const refresh = useCallback(async () => {
-    await Promise.all([loadTierAndOfferings(), loadUsage(), loadSettings()]);
+    await Promise.all([loadTier(), loadUsage(), loadSettings()]);
     setIsLoading(false);
-  }, [loadTierAndOfferings, loadUsage, loadSettings]);
+  }, [loadTier, loadUsage, loadSettings]);
 
   useEffect(() => {
     refresh();
@@ -123,30 +117,20 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     return () => sub.remove();
   }, [refresh]);
 
-  const purchase = useCallback(async (pkg: PurchasesPackage): Promise<boolean> => {
-    try {
-      await purchasePackage(pkg);
-      await loadTierAndOfferings();
-      return true;
-    } catch (e: unknown) {
-      const err = e as { userCancelled?: boolean };
-      if (!err.userCancelled) console.error('[Purchase] failed:', e);
-      return false;
-    }
-  }, [loadTierAndOfferings]);
+  const purchase = useCallback(async (sku: string): Promise<boolean> => {
+    const ok = await purchaseSubscription(sku);
+    if (ok) await loadTier();
+    return ok;
+  }, [loadTier]);
 
   const restore = useCallback(async (): Promise<boolean> => {
-    try {
-      await restorePurchases();
-      await loadTierAndOfferings();
-      return true;
-    } catch (e) {
-      console.error('[Restore] failed:', e);
-      return false;
-    }
-  }, [loadTierAndOfferings]);
+    const restoredTier = await restorePurchases();
+    setTier(restoredTier);
+    return restoredTier !== 'free';
+  }, []);
 
   const features = TIER_FEATURES[tier];
+  const currentUsage = { month: '', estimates: usage.estimates, invoices: usage.invoices };
 
   const incrementEstimateUsage = useCallback(async () => {
     await _incEstimate();
@@ -157,8 +141,6 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     await _incInvoice();
     await loadUsage();
   }, [loadUsage]);
-
-  const currentUsage = { month: '', estimates: usage.estimates, invoices: usage.invoices };
 
   const value: SubscriptionContextType = {
     tier,
@@ -174,10 +156,9 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       await saveSettings(s);
       setSettings(s);
     },
-    checkSubscription: loadTierAndOfferings,
+    checkSubscription: loadTier,
     canUploadLogo: tier === 'enterprise',
 
-    offerings,
     purchase,
     restore,
     refresh,

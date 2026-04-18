@@ -11,12 +11,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
-import type { PurchasesPackage } from 'react-native-purchases';
 import { useSubscription } from '../src/SubscriptionContext';
+import { PRODUCT_IDS, TIER_PRICES } from '../src/lib/subscriptionConfig';
 
 const PRO_FEATURES = [
   '15 estimates per month',
   '15 invoices per month',
+  'Up to 50 unique customers',
   'Camera measurement tool',
   'PDF export & sharing',
   'Priority email support',
@@ -24,6 +25,7 @@ const PRO_FEATURES = [
 
 const ENTERPRISE_FEATURES = [
   'Unlimited estimates & invoices',
+  'Unlimited customers',
   'Custom invoice branding + logo',
   'Team accounts (up to 10 users)',
   'Advanced reporting',
@@ -32,16 +34,13 @@ const ENTERPRISE_FEATURES = [
 
 export default function PaywallScreen() {
   const router = useRouter();
-  const { tier, offerings, purchase, restore } = useSubscription();
+  const { tier, purchase, restore } = useSubscription();
   const [purchasing, setPurchasing] = useState<string | null>(null);
   const [restoring, setRestoring] = useState(false);
 
-  const proPackage = offerings.find(p => p.identifier.includes('pro') || p.product.identifier.includes('pro'));
-  const enterprisePackage = offerings.find(p => p.identifier.includes('enterprise') || p.product.identifier.includes('enterprise'));
-
-  const handlePurchase = async (pkg: PurchasesPackage) => {
-    setPurchasing(pkg.identifier);
-    const ok = await purchase(pkg);
+  const handlePurchase = async (sku: string) => {
+    setPurchasing(sku);
+    const ok = await purchase(sku);
     setPurchasing(null);
     if (ok) {
       Alert.alert('Success!', 'Your subscription is now active.', [
@@ -54,11 +53,13 @@ export default function PaywallScreen() {
     setRestoring(true);
     const ok = await restore();
     setRestoring(false);
-    Alert.alert(
-      ok ? 'Restored' : 'Nothing Found',
-      ok ? 'Your purchases have been restored.' : 'No previous purchases found for this account.',
-    );
-    if (ok) router.back();
+    if (ok) {
+      Alert.alert('Restored', 'Your purchases have been restored.', [
+        { text: 'OK', onPress: () => router.back() },
+      ]);
+    } else {
+      Alert.alert('Nothing Found', 'No previous purchases found for this account.');
+    }
   };
 
   if (tier === 'enterprise') {
@@ -90,7 +91,7 @@ export default function PaywallScreen() {
         {tier === 'free' && (
           <View style={styles.freeBadge}>
             <Text style={styles.freeBadgeText}>
-              Free plan: 3 estimates + 3 invoices per month
+              Free plan: 3 estimates + 3 invoices/month · 5 customers
             </Text>
           </View>
         )}
@@ -99,7 +100,7 @@ export default function PaywallScreen() {
         <View style={styles.card}>
           <Text style={styles.planName}>Esti-Mate Pro</Text>
           <View style={styles.priceRow}>
-            <Text style={styles.price}>$29.99</Text>
+            <Text style={styles.price}>{TIER_PRICES.pro}</Text>
             <Text style={styles.period}>/month</Text>
           </View>
           <Text style={styles.planDesc}>Perfect for independent contractors</Text>
@@ -117,33 +118,29 @@ export default function PaywallScreen() {
             <View style={styles.currentPlanBtn}>
               <Text style={styles.currentPlanText}>✓ Current Plan</Text>
             </View>
-          ) : proPackage ? (
+          ) : (
             <TouchableOpacity
               style={styles.buyBtn}
-              onPress={() => handlePurchase(proPackage)}
+              onPress={() => handlePurchase(PRODUCT_IDS.PRO)}
               disabled={!!purchasing}
             >
-              {purchasing === proPackage.identifier ? (
+              {purchasing === PRODUCT_IDS.PRO ? (
                 <ActivityIndicator color="#fff" />
               ) : (
-                <Text style={styles.buyBtnText}>Get Pro — $29.99/mo</Text>
+                <Text style={styles.buyBtnText}>Get Pro — {TIER_PRICES.pro}/mo</Text>
               )}
             </TouchableOpacity>
-          ) : (
-            <View style={styles.unavailableBtn}>
-              <Text style={styles.unavailableText}>Not available</Text>
-            </View>
           )}
         </View>
 
         {/* Enterprise Card */}
         <View style={[styles.card, styles.cardEnterprise]}>
           <View style={styles.popularBadge}>
-            <Text style={styles.popularText}>MOST POPULAR</Text>
+            <Text style={styles.popularText}>BEST VALUE</Text>
           </View>
           <Text style={styles.planName}>Esti-Mate Enterprise</Text>
           <View style={styles.priceRow}>
-            <Text style={[styles.price, { color: '#f97316' }]}>$99.99</Text>
+            <Text style={[styles.price, { color: '#f97316' }]}>{TIER_PRICES.enterprise}</Text>
             <Text style={styles.period}>/month</Text>
           </View>
           <Text style={styles.planDesc}>For growing construction companies</Text>
@@ -157,29 +154,30 @@ export default function PaywallScreen() {
             ))}
           </View>
 
-          {enterprisePackage ? (
-            <TouchableOpacity
-              style={[styles.buyBtn, styles.buyBtnEnterprise]}
-              onPress={() => handlePurchase(enterprisePackage)}
-              disabled={!!purchasing}
-            >
-              {purchasing === enterprisePackage.identifier ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text style={styles.buyBtnText}>Get Enterprise — $99.99/mo</Text>
-              )}
-            </TouchableOpacity>
-          ) : (
-            <View style={styles.unavailableBtn}>
-              <Text style={styles.unavailableText}>Not available</Text>
-            </View>
-          )}
+          <TouchableOpacity
+            style={[styles.buyBtn, styles.buyBtnEnterprise]}
+            onPress={() => handlePurchase(PRODUCT_IDS.ENTERPRISE)}
+            disabled={!!purchasing}
+          >
+            {purchasing === PRODUCT_IDS.ENTERPRISE ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <Text style={styles.buyBtnText}>
+                Get Enterprise — {TIER_PRICES.enterprise}/mo
+              </Text>
+            )}
+          </TouchableOpacity>
         </View>
 
-        {/* Feature comparison note */}
+        {/* Included in all plans */}
         <View style={styles.comparison}>
           <Text style={styles.comparisonTitle}>All plans include:</Text>
-          {['Materials catalog', 'Camera measurement (Pro+)', 'Tax calculations', 'Local data storage'].map(f => (
+          {[
+            'Materials catalog',
+            'Tax calculations',
+            'PDF export',
+            'Local data storage — works offline',
+          ].map(f => (
             <Text key={f} style={styles.comparisonItem}>• {f}</Text>
           ))}
         </View>
@@ -211,10 +209,7 @@ const styles = StyleSheet.create({
   scrollContent: { paddingBottom: 16 },
 
   header: { alignItems: 'center', paddingVertical: 28, paddingHorizontal: 24 },
-  badge: {
-    color: '#f97316', fontSize: 11, fontWeight: '700',
-    letterSpacing: 2, marginBottom: 8,
-  },
+  badge: { color: '#f97316', fontSize: 11, fontWeight: '700', letterSpacing: 2, marginBottom: 8 },
   title: { color: '#fff', fontSize: 28, fontWeight: '800', textAlign: 'center', marginBottom: 6 },
   subtitle: { color: '#94a3b8', fontSize: 15, textAlign: 'center' },
 
@@ -226,13 +221,9 @@ const styles = StyleSheet.create({
   freeBadgeText: { color: '#64748b', fontSize: 13 },
 
   card: {
-    backgroundColor: '#1e293b',
-    borderRadius: 16,
-    padding: 22,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    borderWidth: 1,
-    borderColor: '#334155',
+    backgroundColor: '#1e293b', borderRadius: 16, padding: 22,
+    marginHorizontal: 16, marginBottom: 16,
+    borderWidth: 1, borderColor: '#334155',
   },
   cardEnterprise: { borderColor: '#f97316', borderWidth: 2 },
 
@@ -264,12 +255,6 @@ const styles = StyleSheet.create({
     paddingVertical: 14, alignItems: 'center',
   },
   currentPlanText: { color: '#4ade80', fontSize: 15, fontWeight: '700' },
-
-  unavailableBtn: {
-    backgroundColor: '#1e293b', borderRadius: 12, borderWidth: 1, borderColor: '#334155',
-    paddingVertical: 14, alignItems: 'center',
-  },
-  unavailableText: { color: '#475569', fontSize: 14 },
 
   comparison: {
     marginHorizontal: 16, padding: 16,

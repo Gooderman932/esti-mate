@@ -1,21 +1,14 @@
 import React, { useEffect } from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { getSettings } from '../src/store/storage';
-import { initPurchases } from '../src/lib/purchases';
+import { initBilling, endBilling } from '../src/lib/purchases';
 import { SubscriptionProvider } from '../src/SubscriptionContext';
 import { MeasureProvider } from '../src/contexts/MeasureContext';
 
 function AppInit({ children }: { children: React.ReactNode }) {
   useEffect(() => {
-    (async () => {
-      try {
-        const settings = await getSettings();
-        initPurchases(settings.userId);
-      } catch (e) {
-        console.error('[AppInit] Failed to initialize purchases:', e);
-      }
-    })();
+    initBilling();
+    return () => { endBilling(); };
   }, []);
 
   return <>{children}</>;
