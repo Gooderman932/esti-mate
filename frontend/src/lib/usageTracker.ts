@@ -65,3 +65,29 @@ export function getResetDate(): string {
   const reset = new Date(now.getFullYear(), now.getMonth() + 1, 1);
   return reset.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
 }
+
+// Count unique customer names across all estimates (empty names excluded)
+export function countUniqueCustomers(
+  estimates: Array<{ id: string; customer: { name: string } }>,
+  excludeEstimateId?: string,
+): Set<string> {
+  const names = new Set<string>();
+  for (const e of estimates) {
+    if (e.id === excludeEstimateId) continue;
+    const name = e.customer.name.trim().toLowerCase();
+    if (name) names.add(name);
+  }
+  return names;
+}
+
+export function canAddCustomer(
+  newName: string,
+  existingCustomerNames: Set<string>,
+  maxCustomers: number | null,
+): boolean {
+  if (maxCustomers === null) return true;
+  const normalized = newName.trim().toLowerCase();
+  if (!normalized) return true; // blank name, no limit needed
+  if (existingCustomerNames.has(normalized)) return true; // already their customer
+  return existingCustomerNames.size < maxCustomers;
+}

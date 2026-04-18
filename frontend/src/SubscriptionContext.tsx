@@ -28,6 +28,8 @@ import {
   getRemainingEstimates,
   getRemainingInvoices,
   getResetDate,
+  countUniqueCustomers,
+  canAddCustomer,
 } from './lib/usageTracker';
 import { getSettings, saveSettings } from './store/storage';
 import { AppSettings } from './types';
@@ -57,6 +59,11 @@ interface SubscriptionContextType {
   // Usage gates
   canAddEstimate: () => boolean;
   canAddInvoice: () => boolean;
+  canAddNewCustomer: (
+    newName: string,
+    allEstimates: Array<{ id: string; customer: { name: string } }>,
+    currentEstimateId: string,
+  ) => boolean;
   canExportPDF: () => boolean;
   canUseBranding: () => boolean;
   canUseCamera: () => boolean;
@@ -177,6 +184,10 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
 
     canAddEstimate: () => canCreateEstimate(currentUsage, features.monthlyEstimates),
     canAddInvoice: () => canCreateInvoice(currentUsage, features.monthlyInvoices),
+    canAddNewCustomer: (newName, allEstimates, currentEstimateId) => {
+      const existing = countUniqueCustomers(allEstimates, currentEstimateId);
+      return canAddCustomer(newName, existing, features.maxUniqueCustomers);
+    },
     canExportPDF: () => features.pdfExport,
     canUseBranding: () => features.customBranding,
     canUseCamera: () => features.cameraAccess,

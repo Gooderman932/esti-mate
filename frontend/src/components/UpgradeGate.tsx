@@ -9,7 +9,7 @@ import {
 import { useRouter } from 'expo-router';
 import { SubscriptionTier } from '../lib/subscriptionConfig';
 
-type GateType = 'estimate' | 'invoice' | 'camera' | 'branding';
+type GateType = 'estimate' | 'invoice' | 'customer' | 'camera' | 'branding';
 
 interface Props {
   visible: boolean;
@@ -26,6 +26,18 @@ interface GateCopy {
 }
 
 const COPY: Record<GateType, Record<'free' | 'pro', GateCopy>> = {
+  customer: {
+    free: {
+      title: 'Customer Limit Reached',
+      message: "Free accounts support up to 5 unique customers.",
+      upgrade: 'Upgrade to Pro or Enterprise for unlimited customers.',
+    },
+    pro: {
+      title: 'Customer Limit Reached',
+      message: "You've reached the customer limit for your plan.",
+      upgrade: 'Upgrade to Enterprise for unlimited customers.',
+    },
+  },
   estimate: {
     free: {
       title: 'Monthly Limit Reached',
@@ -83,6 +95,7 @@ export function UpgradeGate({ visible, onClose, type, tier, resetDate }: Props) 
   const needsEnterprise = type === 'branding' || (tier === 'pro' && (type === 'estimate' || type === 'invoice'));
   const showReset = resetDate && (type === 'estimate' || type === 'invoice');
 
+
   const handleUpgrade = () => {
     onClose();
     router.push('/paywall');
@@ -93,7 +106,7 @@ export function UpgradeGate({ visible, onClose, type, tier, resetDate }: Props) 
       <View style={styles.overlay}>
         <View style={styles.modal}>
           <Text style={styles.icon}>
-            {type === 'camera' || type === 'branding' ? '🔒' : '📊'}
+            {type === 'camera' || type === 'branding' ? '🔒' : type === 'customer' ? '👥' : '📊'}
           </Text>
           <Text style={styles.title}>{copy.title}</Text>
           <Text style={styles.message}>{copy.message}</Text>

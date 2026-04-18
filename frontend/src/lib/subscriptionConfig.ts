@@ -13,6 +13,7 @@ export const PRODUCT_IDS = {
 export interface TierFeatures {
   monthlyEstimates: number | null;  // null = unlimited
   monthlyInvoices: number | null;
+  maxUniqueCustomers: number | null; // null = unlimited
   cameraAccess: boolean;
   pdfExport: boolean;
   customBranding: boolean;
@@ -24,6 +25,7 @@ export const TIER_FEATURES: Record<SubscriptionTier, TierFeatures> = {
   free: {
     monthlyEstimates: 3,
     monthlyInvoices: 3,
+    maxUniqueCustomers: 5,
     cameraAccess: false,
     pdfExport: true,
     customBranding: false,
@@ -33,6 +35,7 @@ export const TIER_FEATURES: Record<SubscriptionTier, TierFeatures> = {
   pro: {
     monthlyEstimates: 15,
     monthlyInvoices: 15,
+    maxUniqueCustomers: null,
     cameraAccess: true,
     pdfExport: true,
     customBranding: false,
@@ -42,6 +45,7 @@ export const TIER_FEATURES: Record<SubscriptionTier, TierFeatures> = {
   enterprise: {
     monthlyEstimates: null,
     monthlyInvoices: null,
+    maxUniqueCustomers: null,
     cameraAccess: true,
     pdfExport: true,
     customBranding: true,

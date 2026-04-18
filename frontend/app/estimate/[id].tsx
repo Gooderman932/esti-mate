@@ -31,21 +31,25 @@ import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 
 import { Estimate, LineItem, AppSettings, Point, DocumentImage, CustomerInfo } from '../../src/types';
-import { getEstimateById, updateEstimate, getSettings, deleteEstimate } from '../../src/store/storage';
+import { getEstimateById, updateEstimate, getSettings, deleteEstimate, getEstimates } from '../../src/store/storage';
 import { calculateLineTotal, calculateSubtotal, calculateTax, calculateGrandTotal, formatCurrency } from '../../src/utils/calculations';
 import { generatePdf, sharePdf, printPdf } from '../../src/utils/pdfGenerator';
 import CornerSelector from '../../src/components/CornerSelector';
 import LineItemForm from '../../src/components/LineItemForm';
+import { UpgradeGate } from '../../src/components/UpgradeGate';
+import { useSubscription } from '../../src/SubscriptionContext';
 
 export default function EstimateDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
-  
+  const { tier, canAddNewCustomer } = useSubscription();
+
   const [estimate, setEstimate] = useState<Estimate | null>(null);
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  
+  const [showCustomerGate, setShowCustomerGate] = useState(false);
+
   // Modal states
   const [showCustomerModal, setShowCustomerModal] = useState(false);
   const [showLineItemModal, setShowLineItemModal] = useState(false);
@@ -272,9 +276,21 @@ export default function EstimateDetailScreen() {
     );
   };
 
-  // Customer update
+  // Customer update — gate on 5-customer free-tier limit
   const handleUpdateCustomer = async (customer: CustomerInfo) => {
     if (!estimate) return;
+
+    // Only check limit when adding a brand-new customer name
+    if (customer.name.trim()) {
+      const allEstimates = await getEstimates();
+      const allowed = canAddNewCustomer(customer.name, allEstimates, estimate.id);
+      if (!allowed) {
+        setShowCustomerModal(false);
+        setShowCustomerGate(true);
+        return;
+      }
+    }
+
     const updatedEstimate = { ...estimate, customer };
     await saveEstimate(updatedEstimate);
     setShowCustomerModal(false);
@@ -694,6 +710,14 @@ export default function EstimateDetailScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* Customer limit gate */}
+      <UpgradeGate
+        visible={showCustomerGate}
+        onClose={() => setShowCustomerGate(false)}
+        type="customer"
+        tier={tier}
+      />
     </SafeAreaView>
   );
 }
