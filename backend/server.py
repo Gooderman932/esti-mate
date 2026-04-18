@@ -21,10 +21,12 @@ import os
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field
-from typing import List, Optional
+from typing import List, Optional, Dict, Any
 import uuid
 from datetime import datetime
 import stripe
+import random
+import string
 
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
@@ -81,6 +83,65 @@ class CreateCustomerRequest(BaseModel):
 class CreateCheckoutRequest(BaseModel):
     user_id: str
 
+
+# ============== WEB ESTIMATE MODELS ==============
+
+class WebCustomerInfo(BaseModel):
+    name: str = ""
+    email: str = ""
+    phone: str = ""
+    address: str = ""
+
+class WebLineItem(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    description: str = ""
+    quantity: float = 1
+    unit_price: float = 0
+    unit: str = "each"
+    amount: float = 0
+    measurement: Optional[str] = None
+    notes: Optional[str] = None
+
+class WebEstimate(BaseModel):
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    number: str = ""
+    type: str = "estimate"  # "estimate" | "invoice"
+    status: str = "draft"
+    customer: WebCustomerInfo = Field(default_factory=WebCustomerInfo)
+    line_items: List[WebLineItem] = []
+    subtotal: float = 0
+    tax_rate: float = 0
+    tax_amount: float = 0
+    total: float = 0
+    notes: str = ""
+    business_name: str = ""
+    share_code: str = Field(
+        default_factory=lambda: ''.join(random.choices(string.ascii_uppercase + string.digits, k=8))
+    )
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+class CreateEstimateRequest(BaseModel):
+    type: str = "estimate"
+    customer_name: str = ""
+    customer_email: str = ""
+    customer_phone: str = ""
+    customer_address: str = ""
+    notes: str = ""
+    business_name: str = ""
+    tax_rate: float = 0
+
+class UpdateEstimateRequest(BaseModel):
+    status: Optional[str] = None
+    customer: Optional[WebCustomerInfo] = None
+    line_items: Optional[List[WebLineItem]] = None
+    subtotal: Optional[float] = None
+    tax_rate: Optional[float] = None
+    tax_amount: Optional[float] = None
+    total: Optional[float] = None
+    notes: Optional[str] = None
+    business_name: Optional[str] = None
+
 class SubscriptionStatusResponse(BaseModel):
     user_id: str
     is_pro: bool
@@ -88,6 +149,143 @@ class SubscriptionStatusResponse(BaseModel):
     subscription_id: Optional[str] = None
     current_period_end: Optional[int] = None
     cancel_at_period_end: bool = False
+
+
+# ============== ESTIMATE ENDPOINTS ==============
+
+async def _next_number(doc_type: str) -> str:
+    """Generate auto-incrementing document number like EST-0001 or INV-0001."""
+    prefix = "EST" if doc_type == "estimate" else "INV"
+    count = await db.estimates.count_documents({"type": doc_type})
+    return f"{prefix}-{str(count + 1).zfill(4)}"
+
+def _serialize(doc: Dict[str, Any]) -> Dict[str, Any]:
+    """Remove MongoDB _id field and convert datetime to ISO string."""
+    doc.pop("_id", None)
+    for k, v in doc.items():
+        if isinstance(v, datetime):
+            doc[k] = v.isoformat()
+    return doc
+
+@api_router.get("/estimates")
+async def list_estimates():
+    """List all estimates/invoices ordered by creation date (newest first)."""
+    cursor = db.estimates.find({}).sort("created_at", -1)
+    docs = []
+    async for doc in cursor:
+        docs.append(_serialize(doc))
+    return docs
+
+@api_router.post("/estimates")
+async def create_estimate(request: CreateEstimateRequest):
+    """Create a new estimate or invoice."""
+    number = await _next_number(request.type)
+    estimate = WebEstimate(
+        number=number,
+        type=request.type,
+        business_name=request.business_name,
+        notes=request.notes,
+        tax_rate=request.tax_rate,
+        customer=WebCustomerInfo(
+            name=request.customer_name,
+            email=request.customer_email,
+            phone=request.customer_phone,
+            address=request.customer_address,
+        ),
+    )
+    doc = estimate.dict()
+    await db.estimates.insert_one(doc)
+    return _serialize(doc)
+
+@api_router.get("/estimates/share/{share_code}")
+async def get_estimate_by_share_code(share_code: str):
+    """Public endpoint — look up an estimate by its share code."""
+    doc = await db.estimates.find_one({"share_code": share_code.upper()})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Estimate not found")
+    return _serialize(doc)
+
+@api_router.get("/estimates/{estimate_id}")
+async def get_estimate(estimate_id: str):
+    """Get a single estimate by ID."""
+    doc = await db.estimates.find_one({"id": estimate_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Estimate not found")
+    return _serialize(doc)
+
+@api_router.put("/estimates/{estimate_id}")
+async def update_estimate(estimate_id: str, request: UpdateEstimateRequest):
+    """Update an estimate's fields."""
+    doc = await db.estimates.find_one({"id": estimate_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Estimate not found")
+
+    updates: Dict[str, Any] = {"updated_at": datetime.utcnow()}
+    if request.status is not None:
+        updates["status"] = request.status
+    if request.customer is not None:
+        updates["customer"] = request.customer.dict()
+    if request.line_items is not None:
+        updates["line_items"] = [i.dict() for i in request.line_items]
+    if request.subtotal is not None:
+        updates["subtotal"] = request.subtotal
+    if request.tax_rate is not None:
+        updates["tax_rate"] = request.tax_rate
+    if request.tax_amount is not None:
+        updates["tax_amount"] = request.tax_amount
+    if request.total is not None:
+        updates["total"] = request.total
+    if request.notes is not None:
+        updates["notes"] = request.notes
+    if request.business_name is not None:
+        updates["business_name"] = request.business_name
+
+    await db.estimates.update_one({"id": estimate_id}, {"$set": updates})
+    updated = await db.estimates.find_one({"id": estimate_id})
+    return _serialize(updated)
+
+@api_router.delete("/estimates/{estimate_id}")
+async def delete_estimate(estimate_id: str):
+    """Delete an estimate by ID."""
+    result = await db.estimates.delete_one({"id": estimate_id})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Estimate not found")
+    return {"deleted": True}
+
+
+# ============== ADMIN STATS ENDPOINT ==============
+
+@api_router.get("/admin/stats")
+async def get_admin_stats():
+    """Aggregate stats for the admin dashboard."""
+    pipeline = [
+        {"$group": {
+            "_id": None,
+            "total": {"$sum": 1},
+            "revenue": {"$sum": "$total"},
+            "estimates": {"$sum": {"$cond": [{"$eq": ["$type", "estimate"]}, 1, 0]}},
+            "invoices": {"$sum": {"$cond": [{"$eq": ["$type", "invoice"]}, 1, 0]}},
+            "drafts": {"$sum": {"$cond": [{"$eq": ["$status", "draft"]}, 1, 0]}},
+            "sent": {"$sum": {"$cond": [{"$eq": ["$status", "sent"]}, 1, 0]}},
+            "accepted": {"$sum": {"$cond": [{"$eq": ["$status", "accepted"]}, 1, 0]}},
+            "paid": {"$sum": {"$cond": [{"$eq": ["$status", "paid"]}, 1, 0]}},
+        }}
+    ]
+    results = await db.estimates.aggregate(pipeline).to_list(1)
+    agg = results[0] if results else {}
+
+    active_subs = await db.subscriptions.count_documents({"status": "active"})
+
+    return {
+        "total_estimates": agg.get("estimates", 0),
+        "total_invoices": agg.get("invoices", 0),
+        "total_revenue": round(agg.get("revenue", 0), 2),
+        "active_subscriptions": active_subs,
+        "drafts": agg.get("drafts", 0),
+        "sent": agg.get("sent", 0),
+        "accepted": agg.get("accepted", 0),
+        "paid": agg.get("paid", 0),
+    }
 
 
 # ============== CUSTOMER ENDPOINTS ==============
