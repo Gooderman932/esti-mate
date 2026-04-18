@@ -1,9 +1,3 @@
-/**
- * Home Screen - Estimates/Invoices List
- * 
- * Main entry point showing all estimates and access to materials
- */
-
 import React, { useState, useCallback } from 'react';
 import {
   View,
@@ -20,27 +14,40 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 
-// Simple UUID generator that works in all environments
 function generateId(): string {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
     const r = Math.random() * 16 | 0;
-    const v = c === 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
   });
 }
-import { Estimate, emptyCustomer, FREE_TIER_LIMITS } from '../src/types';
-import { getEstimates, deleteEstimate, getNextNumber, addEstimate, getSettings, getActiveEstimatesCount } from '../src/store/storage';
+
+import { Estimate, emptyCustomer } from '../src/types';
+import { getEstimates, deleteEstimate, getNextNumber, addEstimate, getSettings } from '../src/store/storage';
 import { calculateSubtotal, calculateTax, calculateGrandTotal, formatCurrency } from '../src/utils/calculations';
 import { useSubscription } from '../src/SubscriptionContext';
+import { UpgradeGate } from '../src/components/UpgradeGate';
+import { UsageBanner } from '../src/components/UsageBanner';
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { isPro, isLoading: subLoading, settings, refreshSettings } = useSubscription();
-  
+  const {
+    tier,
+    isPro,
+    isLoading: subLoading,
+    refreshSettings,
+    canAddEstimate,
+    canAddInvoice,
+    incrementEstimateUsage,
+    incrementInvoiceUsage,
+    resetDate,
+    refresh: refreshSub,
+  } = useSubscription();
+
   const [estimates, setEstimates] = useState<Estimate[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [showNewModal, setShowNewModal] = useState(false);
-  const [activeCount, setActiveCount] = useState(0);
+  const [gateType, setGateType] = useState<'estimate' | 'invoice'>('estimate');
+  const [showGate, setShowGate] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
@@ -50,12 +57,8 @@ export default function HomeScreen() {
 
   const loadData = async () => {
     try {
-      const [estimatesData, count] = await Promise.all([
-        getEstimates(),
-        getActiveEstimatesCount(),
-      ]);
+      const estimatesData = await getEstimates();
       setEstimates(estimatesData);
-      setActiveCount(count);
       await refreshSettings();
     } catch (error) {
       console.error('Error loading data:', error);
@@ -64,7 +67,7 @@ export default function HomeScreen() {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await loadData();
+    await Promise.all([loadData(), refreshSub()]);
     setRefreshing(false);
   };
 
@@ -83,13 +86,15 @@ export default function HomeScreen() {
   };
 
   const handleCreateNew = async (type: 'estimate' | 'invoice') => {
-    // Check free tier limit
-    if (!isPro && activeCount >= FREE_TIER_LIMITS.maxActiveEstimates) {
+    const allowed = type === 'estimate' ? canAddEstimate() : canAddInvoice();
+
+    if (!allowed) {
+      setGateType(type);
       setShowNewModal(false);
-      router.push('/paywall');
+      setShowGate(true);
       return;
     }
-    
+
     try {
       const appSettings = await getSettings();
       const number = await getNextNumber(type);
@@ -106,9 +111,17 @@ export default function HomeScreen() {
         taxRate: appSettings.defaultTaxRate,
       };
       await addEstimate(newEstimate);
+
+      // Track monthly usage
+      if (type === 'estimate') {
+        await incrementEstimateUsage();
+      } else {
+        await incrementInvoiceUsage();
+      }
+
       setShowNewModal(false);
       router.push(`/estimate/${newEstimate.id}`);
-    } catch (error) {
+    } catch {
       Alert.alert('Error', 'Failed to create document');
     }
   };
@@ -120,6 +133,12 @@ export default function HomeScreen() {
       case 'accepted': return '#5856D6';
       default: return '#8E8E93';
     }
+  };
+
+  const tierLabel = () => {
+    if (tier === 'enterprise') return '✓ Enterprise';
+    if (tier === 'pro') return '✓ Pro';
+    return 'Free Plan';
   };
 
   const renderEstimateItem = ({ item }: { item: Estimate }) => {
@@ -148,7 +167,9 @@ export default function HomeScreen() {
           ) : (
             <Text style={styles.noCustomer}>No customer</Text>
           )}
-          <Text style={styles.itemCount}>{item.lineItems.length} item{item.lineItems.length !== 1 ? 's' : ''}</Text>
+          <Text style={styles.itemCount}>
+            {item.lineItems.length} item{item.lineItems.length !== 1 ? 's' : ''}
+          </Text>
         </View>
         <View style={styles.cardFooter}>
           <Text style={styles.dateText}>{new Date(item.createdAt).toLocaleDateString()}</Text>
@@ -183,8 +204,8 @@ export default function HomeScreen() {
       <View style={styles.header}>
         <View>
           <Text style={styles.title}>Estimator</Text>
-          <Text style={styles.subtitle}>
-            {isPro ? '✓ Pro' : `Free (${activeCount}/${FREE_TIER_LIMITS.maxActiveEstimates} active)`}
+          <Text style={[styles.subtitle, isPro && { color: '#f97316' }]}>
+            {tierLabel()}
           </Text>
         </View>
         <View style={styles.headerButtons}>
@@ -196,6 +217,9 @@ export default function HomeScreen() {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Usage Banner */}
+      <UsageBanner />
 
       {/* List */}
       <FlatList
@@ -215,7 +239,12 @@ export default function HomeScreen() {
       )}
 
       {/* New Document Modal */}
-      <Modal visible={showNewModal} transparent animationType="fade" onRequestClose={() => setShowNewModal(false)}>
+      <Modal
+        visible={showNewModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowNewModal(false)}
+      >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <Text style={styles.modalTitle}>Create New</Text>
@@ -233,12 +262,24 @@ export default function HomeScreen() {
                 <Text style={styles.modalOptionSubtitle}>Bill for completed work</Text>
               </View>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.modalCancelButton} onPress={() => setShowNewModal(false)}>
+            <TouchableOpacity
+              style={styles.modalCancelButton}
+              onPress={() => setShowNewModal(false)}
+            >
               <Text style={styles.modalCancelText}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </View>
       </Modal>
+
+      {/* Upgrade Gate */}
+      <UpgradeGate
+        visible={showGate}
+        onClose={() => setShowGate(false)}
+        type={gateType}
+        tier={tier}
+        resetDate={resetDate}
+      />
     </SafeAreaView>
   );
 }
@@ -246,14 +287,22 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: '#f5f5f5' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 12, backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#eee' },
+  header: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    paddingHorizontal: 16, paddingVertical: 12,
+    backgroundColor: '#fff', borderBottomWidth: 1, borderBottomColor: '#eee',
+  },
   title: { fontSize: 24, fontWeight: 'bold', color: '#333' },
   subtitle: { fontSize: 13, color: '#666', marginTop: 2 },
   headerButtons: { flexDirection: 'row', gap: 8 },
   headerButton: { padding: 8 },
   listContainer: { padding: 16, paddingBottom: 100 },
   emptyContainer: { flex: 1 },
-  card: { backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 12, shadowColor: '#000', shadowOffset: { width: 0, height: 1 }, shadowOpacity: 0.1, shadowRadius: 3, elevation: 2 },
+  card: {
+    backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 12,
+    shadowColor: '#000', shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1, shadowRadius: 3, elevation: 2,
+  },
   cardHeader: { marginBottom: 12 },
   cardTitleRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   number: { fontSize: 18, fontWeight: '600', color: '#333' },
@@ -264,7 +313,10 @@ const styles = StyleSheet.create({
   customerName: { fontSize: 15, color: '#333' },
   noCustomer: { fontSize: 15, color: '#999', fontStyle: 'italic' },
   itemCount: { fontSize: 13, color: '#666', marginTop: 4 },
-  cardFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', borderTopWidth: 1, borderTopColor: '#f0f0f0', paddingTop: 12 },
+  cardFooter: {
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+    borderTopWidth: 1, borderTopColor: '#f0f0f0', paddingTop: 12,
+  },
   dateText: { fontSize: 13, color: '#999' },
   totalAmount: { fontSize: 18, fontWeight: '700', color: '#007AFF' },
   emptyState: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 40 },
@@ -272,11 +324,26 @@ const styles = StyleSheet.create({
   emptySubtitle: { fontSize: 14, color: '#666', textAlign: 'center', marginTop: 8, marginBottom: 24 },
   emptyButton: { backgroundColor: '#007AFF', paddingVertical: 14, paddingHorizontal: 32, borderRadius: 8 },
   emptyButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  fab: { position: 'absolute', right: 20, bottom: 20, width: 56, height: 56, borderRadius: 28, backgroundColor: '#007AFF', justifyContent: 'center', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 6, elevation: 8 },
-  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 },
-  modalContent: { backgroundColor: '#fff', borderRadius: 16, padding: 24, width: '100%', maxWidth: 320 },
+  fab: {
+    position: 'absolute', right: 20, bottom: 20,
+    width: 56, height: 56, borderRadius: 28, backgroundColor: '#007AFF',
+    justifyContent: 'center', alignItems: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3, shadowRadius: 6, elevation: 8,
+  },
+  modalOverlay: {
+    flex: 1, backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center', alignItems: 'center', padding: 20,
+  },
+  modalContent: {
+    backgroundColor: '#fff', borderRadius: 16, padding: 24,
+    width: '100%', maxWidth: 320,
+  },
   modalTitle: { fontSize: 20, fontWeight: 'bold', color: '#333', marginBottom: 20, textAlign: 'center' },
-  modalOption: { flexDirection: 'row', alignItems: 'center', padding: 16, backgroundColor: '#f8f8f8', borderRadius: 12, marginBottom: 12 },
+  modalOption: {
+    flexDirection: 'row', alignItems: 'center', padding: 16,
+    backgroundColor: '#f8f8f8', borderRadius: 12, marginBottom: 12,
+  },
   modalOptionText: { marginLeft: 16 },
   modalOptionTitle: { fontSize: 16, fontWeight: '600', color: '#333' },
   modalOptionSubtitle: { fontSize: 13, color: '#666', marginTop: 2 },

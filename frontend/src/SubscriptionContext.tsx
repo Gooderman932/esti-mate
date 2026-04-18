@@ -1,139 +1,193 @@
-/**
- * Subscription Context
- * 
- * Manages subscription state across the app and provides
- * feature gating logic
- */
-
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { Alert } from 'react-native';
-import Constants from 'expo-constants';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+} from 'react';
+import { AppState, AppStateStatus } from 'react-native';
+import type { PurchasesPackage } from 'react-native-purchases';
 import {
-  getSettings,
-  saveSettings,
-  getSubscriptionStatus,
-  saveSubscriptionStatus,
-  getActiveEstimatesCount,
-} from './store/storage';
-import { SubscriptionStatus, AppSettings, FREE_TIER_LIMITS } from './types';
-
-const API_URL = Constants.expoConfig?.extra?.apiUrl || process.env.EXPO_PUBLIC_BACKEND_URL || '';
+  getSubscriptionTier,
+  getOfferings,
+  purchasePackage,
+  restorePurchases,
+} from './lib/purchases';
+import {
+  TIER_FEATURES,
+  SubscriptionTier,
+  TierFeatures,
+} from './lib/subscriptionConfig';
+import {
+  getMonthlyUsage,
+  incrementEstimateUsage as _incEstimate,
+  incrementInvoiceUsage as _incInvoice,
+  canCreateEstimate,
+  canCreateInvoice,
+  getRemainingEstimates,
+  getRemainingInvoices,
+  getResetDate,
+} from './lib/usageTracker';
+import { getSettings, saveSettings } from './store/storage';
+import { AppSettings } from './types';
 
 interface SubscriptionContextType {
+  // Tier
+  tier: SubscriptionTier;
+  features: TierFeatures;
   isPro: boolean;
+  isEnterprise: boolean;
   isLoading: boolean;
+
+  // Settings (backward compat)
   userId: string | null;
-  subscriptionStatus: SubscriptionStatus | null;
   settings: AppSettings | null;
-  checkSubscription: () => Promise<void>;
-  canCreateEstimate: () => Promise<boolean>;
-  canUploadLogo: boolean;
   refreshSettings: () => Promise<void>;
-  updateSettings: (settings: AppSettings) => Promise<void>;
+  updateSettings: (s: AppSettings) => Promise<void>;
+  checkSubscription: () => Promise<void>;
+  canUploadLogo: boolean;
+
+  // Offerings & purchase
+  offerings: PurchasesPackage[];
+  purchase: (pkg: PurchasesPackage) => Promise<boolean>;
+  restore: () => Promise<boolean>;
+  refresh: () => Promise<void>;
+
+  // Usage gates
+  canAddEstimate: () => boolean;
+  canAddInvoice: () => boolean;
+  canExportPDF: () => boolean;
+  canUseBranding: () => boolean;
+  canUseCamera: () => boolean;
+
+  // Usage info for UI
+  remainingEstimates: number | null;
+  remainingInvoices: number | null;
+  monthlyUsage: { estimates: number; invoices: number };
+  resetDate: string;
+
+  // Increment usage (call right before creating a document)
+  incrementEstimateUsage: () => Promise<void>;
+  incrementInvoiceUsage: () => Promise<void>;
 }
 
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
 
 export function SubscriptionProvider({ children }: { children: React.ReactNode }) {
-  const [isPro, setIsPro] = useState(false);
+  const [tier, setTier] = useState<SubscriptionTier>('free');
   const [isLoading, setIsLoading] = useState(true);
-  const [userId, setUserId] = useState<string | null>(null);
-  const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus | null>(null);
   const [settings, setSettings] = useState<AppSettings | null>(null);
+  const [offerings, setOfferings] = useState<PurchasesPackage[]>([]);
+  const [usage, setUsage] = useState({ estimates: 0, invoices: 0 });
+  const appStateRef = useRef(AppState.currentState);
 
-  // Initialize on mount
-  useEffect(() => {
-    initializeApp();
+  const loadUsage = useCallback(async () => {
+    const u = await getMonthlyUsage();
+    setUsage({ estimates: u.estimates, invoices: u.invoices });
   }, []);
 
-  const initializeApp = async () => {
-    try {
-      setIsLoading(true);
-      
-      // Load settings (includes userId)
-      const appSettings = await getSettings();
-      setSettings(appSettings);
-      setUserId(appSettings.userId);
-      
-      // Check subscription status
-      await checkSubscriptionFromServer(appSettings.userId);
-    } catch (error) {
-      console.error('Error initializing app:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const loadTierAndOfferings = useCallback(async () => {
+    const [t, pkgs] = await Promise.all([getSubscriptionTier(), getOfferings()]);
+    setTier(t);
+    setOfferings(pkgs);
+  }, []);
 
-  const checkSubscriptionFromServer = async (uid: string) => {
-    try {
-      // Try to ensure customer exists
-      await fetch(`${API_URL}/api/customers/create`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: uid }),
-      });
-      
-      // Check subscription status
-      const response = await fetch(`${API_URL}/api/subscriptions/status/${uid}`);
-      if (response.ok) {
-        const data = await response.json();
-        const status: SubscriptionStatus = {
-          userId: uid,
-          isPro: data.is_pro,
-          subscriptionId: data.subscription_id,
-          status: data.status,
-          currentPeriodEnd: data.current_period_end,
-          cancelAtPeriodEnd: data.cancel_at_period_end,
-        };
-        setSubscriptionStatus(status);
-        setIsPro(data.is_pro);
-        await saveSubscriptionStatus(status);
+  const loadSettings = useCallback(async () => {
+    const s = await getSettings();
+    setSettings(s);
+  }, []);
+
+  const refresh = useCallback(async () => {
+    await Promise.all([loadTierAndOfferings(), loadUsage(), loadSettings()]);
+    setIsLoading(false);
+  }, [loadTierAndOfferings, loadUsage, loadSettings]);
+
+  useEffect(() => {
+    refresh();
+
+    const sub = AppState.addEventListener('change', (next: AppStateStatus) => {
+      if (appStateRef.current.match(/inactive|background/) && next === 'active') {
+        refresh();
       }
-    } catch (error) {
-      console.error('Error checking subscription:', error);
-      // Fall back to cached status
-      const cached = await getSubscriptionStatus();
-      if (cached) {
-        setSubscriptionStatus(cached);
-        setIsPro(cached.isPro);
-      }
+      appStateRef.current = next;
+    });
+
+    return () => sub.remove();
+  }, [refresh]);
+
+  const purchase = useCallback(async (pkg: PurchasesPackage): Promise<boolean> => {
+    try {
+      await purchasePackage(pkg);
+      await loadTierAndOfferings();
+      return true;
+    } catch (e: unknown) {
+      const err = e as { userCancelled?: boolean };
+      if (!err.userCancelled) console.error('[Purchase] failed:', e);
+      return false;
     }
-  };
+  }, [loadTierAndOfferings]);
 
-  const checkSubscription = useCallback(async () => {
-    if (userId) {
-      await checkSubscriptionFromServer(userId);
+  const restore = useCallback(async (): Promise<boolean> => {
+    try {
+      await restorePurchases();
+      await loadTierAndOfferings();
+      return true;
+    } catch (e) {
+      console.error('[Restore] failed:', e);
+      return false;
     }
-  }, [userId]);
+  }, [loadTierAndOfferings]);
 
-  const canCreateEstimate = async (): Promise<boolean> => {
-    if (isPro) return true;
-    
-    const activeCount = await getActiveEstimatesCount();
-    return activeCount < FREE_TIER_LIMITS.maxActiveEstimates;
-  };
+  const features = TIER_FEATURES[tier];
 
-  const refreshSettings = async () => {
-    const appSettings = await getSettings();
-    setSettings(appSettings);
-  };
+  const incrementEstimateUsage = useCallback(async () => {
+    await _incEstimate();
+    await loadUsage();
+  }, [loadUsage]);
 
-  const updateSettings = async (newSettings: AppSettings) => {
-    await saveSettings(newSettings);
-    setSettings(newSettings);
-  };
+  const incrementInvoiceUsage = useCallback(async () => {
+    await _incInvoice();
+    await loadUsage();
+  }, [loadUsage]);
+
+  const currentUsage = { month: '', estimates: usage.estimates, invoices: usage.invoices };
 
   const value: SubscriptionContextType = {
-    isPro,
+    tier,
+    features,
+    isPro: tier === 'pro' || tier === 'enterprise',
+    isEnterprise: tier === 'enterprise',
     isLoading,
-    userId,
-    subscriptionStatus,
+
+    userId: settings?.userId ?? null,
     settings,
-    checkSubscription,
-    canCreateEstimate,
-    canUploadLogo: isPro,
-    refreshSettings,
-    updateSettings,
+    refreshSettings: loadSettings,
+    updateSettings: async (s: AppSettings) => {
+      await saveSettings(s);
+      setSettings(s);
+    },
+    checkSubscription: loadTierAndOfferings,
+    canUploadLogo: tier === 'enterprise',
+
+    offerings,
+    purchase,
+    restore,
+    refresh,
+
+    canAddEstimate: () => canCreateEstimate(currentUsage, features.monthlyEstimates),
+    canAddInvoice: () => canCreateInvoice(currentUsage, features.monthlyInvoices),
+    canExportPDF: () => features.pdfExport,
+    canUseBranding: () => features.customBranding,
+    canUseCamera: () => features.cameraAccess,
+
+    remainingEstimates: getRemainingEstimates(currentUsage, features.monthlyEstimates),
+    remainingInvoices: getRemainingInvoices(currentUsage, features.monthlyInvoices),
+    monthlyUsage: usage,
+    resetDate: getResetDate(),
+
+    incrementEstimateUsage,
+    incrementInvoiceUsage,
   };
 
   return (
@@ -143,10 +197,8 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
   );
 }
 
-export function useSubscription() {
-  const context = useContext(SubscriptionContext);
-  if (!context) {
-    throw new Error('useSubscription must be used within SubscriptionProvider');
-  }
-  return context;
+export function useSubscription(): SubscriptionContextType {
+  const ctx = useContext(SubscriptionContext);
+  if (!ctx) throw new Error('useSubscription must be used within SubscriptionProvider');
+  return ctx;
 }
