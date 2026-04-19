@@ -1,0 +1,7 @@
+node_modules/
+.git/
+android/
+ios/
+*.log
+.expo/
+dist/
