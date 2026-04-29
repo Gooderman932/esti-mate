@@ -1,9 +1,3 @@
-/**
- * Settings Screen
- * 
- * Business info, tax rate, and subscription management
- */
-
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -23,13 +17,10 @@ import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useSubscription } from '../src/SubscriptionContext';
 import { AppSettings } from '../src/types';
-import Constants from 'expo-constants';
-
-const API_URL = Constants.expoConfig?.extra?.apiUrl || process.env.EXPO_PUBLIC_BACKEND_URL || '';
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { isPro, settings, updateSettings, checkSubscription, subscriptionStatus, userId } = useSubscription();
+  const { tier, isPro, isEnterprise, settings, updateSettings } = useSubscription();
 
   const [businessName, setBusinessName] = useState('');
   const [businessEmail, setBusinessEmail] = useState('');
@@ -60,7 +51,7 @@ export default function SettingsScreen() {
         email: businessEmail.trim(),
         phone: businessPhone.trim(),
         address: businessAddress.trim(),
-        logoBase64: isPro ? logoBase64 : undefined, // Only save logo if Pro
+        logoBase64: isEnterprise ? logoBase64 : undefined,
       },
       defaultTaxRate: parseFloat(defaultTaxRate) || 0,
     };
@@ -71,10 +62,10 @@ export default function SettingsScreen() {
   };
 
   const handlePickLogo = async () => {
-    if (!isPro) {
+    if (!isEnterprise) {
       Alert.alert(
-        'Pro Feature',
-        'Upload a custom logo with Pro subscription',
+        'Enterprise Feature',
+        'Upload a custom logo with Enterprise subscription',
         [
           { text: 'Cancel', style: 'cancel' },
           { text: 'Upgrade', onPress: () => router.push('/paywall') },
@@ -108,33 +99,16 @@ export default function SettingsScreen() {
     setHasChanges(true);
   };
 
-  const handleCancelSubscription = async () => {
-    Alert.alert(
-      'Cancel Subscription',
-      'Are you sure you want to cancel your Pro subscription? You will keep access until the end of your billing period.',
-      [
-        { text: 'Keep Subscription', style: 'cancel' },
-        {
-          text: 'Cancel',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              const response = await fetch(`${API_URL}/api/subscriptions/cancel/${userId}`, {
-                method: 'POST',
-              });
-              if (response.ok) {
-                await checkSubscription();
-                Alert.alert('Canceled', 'Your subscription has been canceled and will not renew.');
-              } else {
-                Alert.alert('Error', 'Failed to cancel subscription.');
-              }
-            } catch (error) {
-              Alert.alert('Error', 'Failed to cancel subscription.');
-            }
-          },
-        },
-      ]
-    );
+  const tierLabel = () => {
+    if (tier === 'enterprise') return 'Enterprise';
+    if (tier === 'pro') return 'Pro';
+    return 'Free';
+  };
+
+  const tierColor = () => {
+    if (tier === 'enterprise') return '#f97316';
+    if (tier === 'pro') return '#3b82f6';
+    return '#64748b';
   };
 
   return (
@@ -145,32 +119,27 @@ export default function SettingsScreen() {
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Subscription</Text>
             <View style={styles.subscriptionCard}>
-              {isPro ? (
-                <>
-                  <View style={styles.proStatus}>
-                    <Ionicons name="checkmark-circle" size={24} color="#34C759" />
-                    <Text style={styles.proStatusText}>Pro Active</Text>
-                  </View>
-                  {subscriptionStatus?.currentPeriodEnd && (
-                    <Text style={styles.renewalText}>
-                      {subscriptionStatus.cancelAtPeriodEnd
-                        ? `Cancels: ${new Date(subscriptionStatus.currentPeriodEnd * 1000).toLocaleDateString()}`
-                        : `Renews: ${new Date(subscriptionStatus.currentPeriodEnd * 1000).toLocaleDateString()}`}
-                    </Text>
-                  )}
-                  {!subscriptionStatus?.cancelAtPeriodEnd && (
-                    <TouchableOpacity style={styles.cancelButton} onPress={handleCancelSubscription}>
-                      <Text style={styles.cancelButtonText}>Cancel Subscription</Text>
-                    </TouchableOpacity>
-                  )}
-                </>
-              ) : (
-                <>
-                  <Text style={styles.freeText}>Free Tier</Text>
-                  <TouchableOpacity style={styles.upgradeButton} onPress={() => router.push('/paywall')}>
-                    <Text style={styles.upgradeButtonText}>Upgrade to Pro</Text>
-                  </TouchableOpacity>
-                </>
+              <View style={styles.tierRow}>
+                <Ionicons
+                  name={isPro ? 'checkmark-circle' : 'ellipse-outline'}
+                  size={24}
+                  color={tierColor()}
+                />
+                <Text style={[styles.tierText, { color: tierColor() }]}>
+                  {tierLabel()} Plan
+                </Text>
+              </View>
+              {!isEnterprise && (
+                <TouchableOpacity style={styles.upgradeButton} onPress={() => router.push('/paywall')}>
+                  <Text style={styles.upgradeButtonText}>
+                    {isPro ? 'Upgrade to Enterprise' : 'Upgrade Plan'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              {isPro && (
+                <Text style={styles.manageText}>
+                  Manage subscription in Google Play → Subscriptions
+                </Text>
               )}
             </View>
           </View>
@@ -178,10 +147,13 @@ export default function SettingsScreen() {
           {/* Business Info */}
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>Business Information</Text>
-            
+
             {/* Logo */}
             <View style={styles.logoSection}>
-              <Text style={styles.label}>Company Logo {!isPro && <Text style={styles.proTag}>(Pro)</Text>}</Text>
+              <Text style={styles.label}>
+                Company Logo{' '}
+                {!isEnterprise && <Text style={styles.enterpriseTag}>(Enterprise)</Text>}
+              </Text>
               {logoBase64 ? (
                 <View style={styles.logoPreview}>
                   <Image source={{ uri: logoBase64 }} style={styles.logoImage} resizeMode="contain" />
@@ -191,9 +163,9 @@ export default function SettingsScreen() {
                 </View>
               ) : (
                 <TouchableOpacity style={styles.logoPlaceholder} onPress={handlePickLogo}>
-                  <Ionicons name="image-outline" size={32} color={isPro ? '#007AFF' : '#ccc'} />
-                  <Text style={[styles.logoPlaceholderText, !isPro && { color: '#ccc' }]}>
-                    {isPro ? 'Tap to add logo' : 'Upgrade to add logo'}
+                  <Ionicons name="image-outline" size={32} color={isEnterprise ? '#f97316' : '#ccc'} />
+                  <Text style={[styles.logoPlaceholderText, !isEnterprise && { color: '#ccc' }]}>
+                    {isEnterprise ? 'Tap to add logo' : 'Upgrade to Enterprise to add logo'}
                   </Text>
                 </TouchableOpacity>
               )}
@@ -264,12 +236,6 @@ export default function SettingsScreen() {
               <Text style={styles.hint}>Applied to new estimates. Can be changed per document.</Text>
             </View>
           </View>
-
-          {/* Device ID */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Device</Text>
-            <Text style={styles.deviceId}>ID: {userId?.slice(0, 8)}...</Text>
-          </View>
         </ScrollView>
 
         {/* Save Button */}
@@ -293,26 +259,22 @@ const styles = StyleSheet.create({
   section: { backgroundColor: '#fff', marginTop: 16, padding: 16 },
   sectionTitle: { fontSize: 14, fontWeight: '600', color: '#666', textTransform: 'uppercase', marginBottom: 12 },
   subscriptionCard: { backgroundColor: '#f8f8f8', padding: 16, borderRadius: 12 },
-  proStatus: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  proStatusText: { fontSize: 18, fontWeight: '600', color: '#34C759' },
-  renewalText: { fontSize: 13, color: '#666', marginTop: 8 },
-  cancelButton: { marginTop: 12 },
-  cancelButtonText: { color: '#FF3B30', fontSize: 14 },
-  freeText: { fontSize: 18, fontWeight: '600', color: '#666' },
-  upgradeButton: { backgroundColor: '#007AFF', paddingVertical: 12, borderRadius: 8, alignItems: 'center', marginTop: 12 },
+  tierRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 12 },
+  tierText: { fontSize: 18, fontWeight: '600' },
+  upgradeButton: { backgroundColor: '#f97316', paddingVertical: 12, borderRadius: 8, alignItems: 'center', marginTop: 4 },
   upgradeButtonText: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  manageText: { fontSize: 12, color: '#94a3b8', marginTop: 10, textAlign: 'center' },
   logoSection: { marginBottom: 16 },
   logoPreview: { position: 'relative', backgroundColor: '#f8f8f8', borderRadius: 8, padding: 16, alignItems: 'center' },
   logoImage: { width: '100%', height: 60 },
   logoRemove: { position: 'absolute', top: 8, right: 8 },
   logoPlaceholder: { backgroundColor: '#f8f8f8', borderRadius: 8, padding: 24, alignItems: 'center', borderWidth: 2, borderColor: '#e0e0e0', borderStyle: 'dashed' },
-  logoPlaceholderText: { fontSize: 14, color: '#007AFF', marginTop: 8 },
+  logoPlaceholderText: { fontSize: 14, color: '#f97316', marginTop: 8 },
   field: { marginBottom: 16 },
   label: { fontSize: 14, fontWeight: '500', color: '#333', marginBottom: 6 },
-  proTag: { color: '#FFD700', fontWeight: 'bold' },
+  enterpriseTag: { color: '#f97316', fontWeight: '700' },
   input: { backgroundColor: '#f8f8f8', borderWidth: 1, borderColor: '#e0e0e0', borderRadius: 8, padding: 12, fontSize: 16, color: '#333' },
   hint: { fontSize: 12, color: '#999', marginTop: 4 },
-  deviceId: { fontSize: 12, color: '#999', fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
   footer: { padding: 16, backgroundColor: '#fff', borderTopWidth: 1, borderTopColor: '#eee' },
   saveButton: { backgroundColor: '#007AFF', paddingVertical: 16, borderRadius: 12, alignItems: 'center' },
   saveButtonDisabled: { backgroundColor: '#ccc' },
