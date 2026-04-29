@@ -1,13 +1,13 @@
 {
   "expo": {
-    "name": "DocScanner",
+    "name": "Esti-Mate Pro",
     "slug": "frontend",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "frontend",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
+    "newArchEnabled": false,
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
@@ -24,7 +24,8 @@
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.WRITE_EXTERNAL_STORAGE"
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "com.android.vending.BILLING"
       ]
     },
     "web": {
