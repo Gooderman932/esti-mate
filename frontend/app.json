@@ -35,6 +35,7 @@
     },
     "plugins": [
       "expo-router",
+      "./plugins/withIAPAndroidFlavor",
       [
         "expo-splash-screen",
         {
