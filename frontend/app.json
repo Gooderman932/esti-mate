@@ -1,21 +1,26 @@
 {
   "expo": {
-    "name": "DocScanner",
-    "slug": "frontend",
-    "version": "1.0.0",
+    "name": "Esti-Mate Pro",
+    "slug": "esti-mate",
+    "version": "1.1.5",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "frontend",
+    "scheme": "estimateapp",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "owner": "gooderman",
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.poordudeholdings.estimatemobile",
+      "buildNumber": "101",
       "infoPlist": {
         "NSCameraUsageDescription": "Scan documents for estimates and invoices",
         "NSPhotoLibraryUsageDescription": "Select document photos for estimates"
       }
     },
     "android": {
+      "package": "com.poordudeholdings.estimatemobile",
+      "versionCode": 101,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#000"
@@ -24,7 +29,8 @@
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.WRITE_EXTERNAL_STORAGE"
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "com.android.vending.BILLING"
       ]
     },
     "web": {
@@ -42,10 +48,17 @@
           "resizeMode": "contain",
           "backgroundColor": "#000"
         }
-      ]
+      ],
+      "./plugins/withRNIAP"
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "apiUrl": "",
+      "eas": {
+        "projectId": "7c643dce-d1d5-4011-b6f7-a976a7deb2e7"
+      }
     }
   }
 }

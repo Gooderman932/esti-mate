@@ -6,13 +6,15 @@
   "build": {
     "production": {
       "android": {
-        "buildType": "app-bundle"
+        "buildType": "app-bundle",
+        "autoIncrement": false
       }
     },
     "preview": {
       "distribution": "internal",
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "autoIncrement": false
       }
     }
   }
