@@ -1,0 +1,37 @@
+# Reduce EAS build archive size
+
+# Dependencies (installed fresh on EAS workers)
+node_modules/
+
+# Native build artifacts (EAS runs expo prebuild)
+android/
+ios/
+
+# Metro cache
+.metro-cache/
+
+# Git
+.git/
+
+# Local env files
+.env
+.env.local
+.env.*.local
+
+# Test files
+__tests__/
+**/__tests__/
+*.test.ts
+*.test.tsx
+*.spec.ts
+*.spec.tsx
+
+# Editor and OS
+.vscode/
+.idea/
+.DS_Store
+*.swp
+*.swo
+
+# Docs
+*.md
