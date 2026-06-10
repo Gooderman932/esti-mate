@@ -28,19 +28,19 @@ function generateId(): string {
     return v.toString(16);
   });
 }
-import { Estimate, emptyCustomer, FREE_TIER_LIMITS } from '../src/types';
-import { getEstimates, deleteEstimate, getNextNumber, addEstimate, getSettings, getActiveEstimatesCount } from '../src/store/storage';
+import { Estimate, emptyCustomer, TIER_LIMITS } from '../src/types';
+import { getEstimates, deleteEstimate, getNextNumber, addEstimate, getSettings, getDocumentsCreatedThisMonth } from '../src/store/storage';
 import { calculateSubtotal, calculateTax, calculateGrandTotal, formatCurrency } from '../src/utils/calculations';
 import { useSubscription } from '../src/SubscriptionContext';
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { isPro, isLoading: subLoading, settings, refreshSettings } = useSubscription();
-  
+  const { tier, isPro, isEnterprise, isLoading: subLoading, settings, refreshSettings, canCreateEstimate } = useSubscription();
+
   const [estimates, setEstimates] = useState<Estimate[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [showNewModal, setShowNewModal] = useState(false);
-  const [activeCount, setActiveCount] = useState(0);
+  const [monthCount, setMonthCount] = useState(0);
 
   useFocusEffect(
     useCallback(() => {
@@ -52,10 +52,10 @@ export default function HomeScreen() {
     try {
       const [estimatesData, count] = await Promise.all([
         getEstimates(),
-        getActiveEstimatesCount(),
+        getDocumentsCreatedThisMonth(),
       ]);
       setEstimates(estimatesData);
-      setActiveCount(count);
+      setMonthCount(count);
       await refreshSettings();
     } catch (error) {
       console.error('Error loading data:', error);
@@ -83,8 +83,9 @@ export default function HomeScreen() {
   };
 
   const handleCreateNew = async (type: 'estimate' | 'invoice') => {
-    // Check free tier limit
-    if (!isPro && activeCount >= FREE_TIER_LIMITS.maxActiveEstimates) {
+    // Check monthly tier limit
+    const allowed = await canCreateEstimate();
+    if (!allowed) {
       setShowNewModal(false);
       router.push('/paywall');
       return;
@@ -184,7 +185,11 @@ export default function HomeScreen() {
         <View>
           <Text style={styles.title}>Estimator</Text>
           <Text style={styles.subtitle}>
-            {isPro ? '✓ Pro' : `Free (${activeCount}/${FREE_TIER_LIMITS.maxActiveEstimates} active)`}
+            {isEnterprise
+              ? '✓ Enterprise'
+              : isPro
+                ? `✓ Pro (${monthCount}/${TIER_LIMITS.pro.maxDocumentsPerMonth} this month)`
+                : `Free (${monthCount}/${TIER_LIMITS.free.maxDocumentsPerMonth} this month)`}
           </Text>
         </View>
         <View style={styles.headerButtons}>

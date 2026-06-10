@@ -10,7 +10,12 @@ Environment Variables Required:
 - DB_NAME: Database name
 - STRIPE_SECRET_KEY: Stripe secret key
 - STRIPE_WEBHOOK_SECRET: Stripe webhook signing secret
-- STRIPE_PRICE_ID: Pro tier price ID from Stripe dashboard
+- STRIPE_PRICE_ID_PRO: Pro tier price ID from Stripe dashboard
+- STRIPE_PRICE_ID_ENTERPRISE: Enterprise tier price ID from Stripe dashboard
+- APP_URL: Public URL used for Stripe checkout redirects
+- GOOGLE_PLAY_PACKAGE_NAME: Android package name (com.poordudeholdings.estimatemobile)
+- GOOGLE_SERVICE_ACCOUNT_JSON: (optional) service account JSON for verifying
+  Google Play purchases server-side via the Play Developer API
 """
 
 from fastapi import FastAPI, APIRouter, HTTPException, Request
@@ -38,6 +43,19 @@ db = client[os.environ['DB_NAME']]
 stripe.api_key = os.environ.get('STRIPE_SECRET_KEY', '')
 STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
 STRIPE_PRICE_ID = os.environ.get('STRIPE_PRICE_ID', 'price_PLACEHOLDER')
+STRIPE_PRICE_ID_PRO = os.environ.get('STRIPE_PRICE_ID_PRO', STRIPE_PRICE_ID)
+STRIPE_PRICE_ID_ENTERPRISE = os.environ.get('STRIPE_PRICE_ID_ENTERPRISE', '')
+APP_URL = os.environ.get('APP_URL', 'https://measure-build-3.preview.emergentagent.com')
+
+# Google Play configuration
+GOOGLE_PLAY_PACKAGE_NAME = os.environ.get('GOOGLE_PLAY_PACKAGE_NAME', 'com.poordudeholdings.estimatemobile')
+GOOGLE_SERVICE_ACCOUNT_JSON = os.environ.get('GOOGLE_SERVICE_ACCOUNT_JSON', '')
+
+# Google Play subscription product IDs -> tier
+GOOGLE_PLAY_PRODUCT_TIERS = {
+    'pro_monthly': 'pro',
+    'enterprise_monthly': 'enterprise',
+}
 
 # Create the main app
 app = FastAPI(title="Construction Estimator API")
@@ -80,10 +98,18 @@ class CreateCustomerRequest(BaseModel):
 
 class CreateCheckoutRequest(BaseModel):
     user_id: str
+    plan: str = "pro"  # "pro" or "enterprise"
+
+class VerifyGooglePlayRequest(BaseModel):
+    user_id: str
+    product_id: str
+    purchase_token: str
 
 class SubscriptionStatusResponse(BaseModel):
     user_id: str
     is_pro: bool
+    tier: str = "free"  # free, pro, enterprise
+    billing_source: Optional[str] = None  # stripe or google_play
     status: str
     subscription_id: Optional[str] = None
     current_period_end: Optional[int] = None
@@ -150,6 +176,130 @@ async def create_customer(request: CreateCustomerRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# ============== GOOGLE PLAY BILLING ==============
+
+def _verify_with_play_developer_api(product_id: str, purchase_token: str) -> Optional[dict]:
+    """Verify a subscription purchase with the Google Play Developer API.
+
+    Returns the subscription resource dict, or None when no service account
+    is configured (in which case we trust the client-supplied token).
+    Raises HTTPException when Google rejects the token.
+    """
+    if not GOOGLE_SERVICE_ACCOUNT_JSON:
+        return None
+    try:
+        import json
+        from google.oauth2 import service_account
+        from googleapiclient.discovery import build
+
+        credentials = service_account.Credentials.from_service_account_info(
+            json.loads(GOOGLE_SERVICE_ACCOUNT_JSON),
+            scopes=["https://www.googleapis.com/auth/androidpublisher"],
+        )
+        service = build("androidpublisher", "v3", credentials=credentials)
+        result = service.purchases().subscriptions().get(
+            packageName=GOOGLE_PLAY_PACKAGE_NAME,
+            subscriptionId=product_id,
+            token=purchase_token,
+        ).execute()
+        return result
+    except ImportError:
+        logger.warning("google-api-python-client not installed; skipping server-side verification")
+        return None
+    except Exception as e:
+        logger.error(f"Google Play verification failed: {e}")
+        raise HTTPException(status_code=400, detail="Google Play purchase verification failed")
+
+
+@api_router.post("/subscriptions/verify-google-play")
+async def verify_google_play_purchase(request: VerifyGooglePlayRequest):
+    """Record (and optionally verify) a Google Play subscription purchase"""
+    tier = GOOGLE_PLAY_PRODUCT_TIERS.get(request.product_id)
+    if not tier:
+        raise HTTPException(status_code=400, detail=f"Unknown product: {request.product_id}")
+
+    expiry_ms = None
+    auto_renewing = True
+    verification = _verify_with_play_developer_api(request.product_id, request.purchase_token)
+    if verification:
+        expiry_ms = int(verification.get("expiryTimeMillis", 0)) or None
+        auto_renewing = bool(verification.get("autoRenewing", True))
+        if expiry_ms and expiry_ms < int(datetime.utcnow().timestamp() * 1000):
+            raise HTTPException(status_code=400, detail="Subscription is expired")
+
+    await db.google_play_subscriptions.update_one(
+        {"user_id": request.user_id},
+        {"$set": {
+            "user_id": request.user_id,
+            "product_id": request.product_id,
+            "purchase_token": request.purchase_token,
+            "tier": tier,
+            "status": "active",
+            "expiry_time_millis": expiry_ms,
+            "auto_renewing": auto_renewing,
+            "verified_with_google": verification is not None,
+            "updated_at": datetime.utcnow(),
+        }},
+        upsert=True,
+    )
+
+    logger.info(f"Recorded Google Play {tier} subscription for user {request.user_id}")
+    return {
+        "status": "active",
+        "tier": tier,
+        "verified_with_google": verification is not None,
+    }
+
+
+async def _get_google_play_status(user_id: str) -> Optional[SubscriptionStatusResponse]:
+    """Return an active Google Play subscription status for the user, if any"""
+    record = await db.google_play_subscriptions.find_one({"user_id": user_id})
+    if not record or record.get("status") != "active":
+        return None
+
+    expiry_ms = record.get("expiry_time_millis")
+    if expiry_ms and expiry_ms < int(datetime.utcnow().timestamp() * 1000):
+        # Re-check with Google in case the subscription renewed
+        try:
+            verification = _verify_with_play_developer_api(
+                record["product_id"], record["purchase_token"]
+            )
+        except HTTPException:
+            verification = None
+        if verification:
+            new_expiry = int(verification.get("expiryTimeMillis", 0)) or None
+            if new_expiry and new_expiry > int(datetime.utcnow().timestamp() * 1000):
+                await db.google_play_subscriptions.update_one(
+                    {"_id": record["_id"]},
+                    {"$set": {"expiry_time_millis": new_expiry, "updated_at": datetime.utcnow()}},
+                )
+                expiry_ms = new_expiry
+            else:
+                await db.google_play_subscriptions.update_one(
+                    {"_id": record["_id"]},
+                    {"$set": {"status": "canceled", "updated_at": datetime.utcnow()}},
+                )
+                return None
+        else:
+            # No way to confirm renewal; treat as expired
+            await db.google_play_subscriptions.update_one(
+                {"_id": record["_id"]},
+                {"$set": {"status": "canceled", "updated_at": datetime.utcnow()}},
+            )
+            return None
+
+    return SubscriptionStatusResponse(
+        user_id=user_id,
+        is_pro=True,
+        tier=record.get("tier", "pro"),
+        billing_source="google_play",
+        status="active",
+        subscription_id=record.get("product_id"),
+        current_period_end=int(expiry_ms / 1000) if expiry_ms else None,
+        cancel_at_period_end=not record.get("auto_renewing", True),
+    )
+
+
 # ============== SUBSCRIPTION ENDPOINTS ==============
 
 @api_router.post("/subscriptions/create-checkout")
@@ -169,17 +319,25 @@ async def create_subscription_checkout(request: CreateCheckoutRequest):
                 "message": "Stripe not configured. Set STRIPE_SECRET_KEY in backend/.env"
             }
         
+        # Pick the price for the requested plan
+        if request.plan == "enterprise":
+            price_id = STRIPE_PRICE_ID_ENTERPRISE
+            if not price_id:
+                raise HTTPException(status_code=400, detail="Enterprise plan not configured (STRIPE_PRICE_ID_ENTERPRISE)")
+        else:
+            price_id = STRIPE_PRICE_ID_PRO
+
         # Create Checkout Session for subscription
         checkout_session = stripe.checkout.Session.create(
             customer=customer["stripe_customer_id"],
             mode="subscription",
             line_items=[{
-                "price": STRIPE_PRICE_ID,
+                "price": price_id,
                 "quantity": 1,
             }],
-            success_url="https://measure-build-3.preview.emergentagent.com/?success=true",
-            cancel_url="https://measure-build-3.preview.emergentagent.com/?canceled=true",
-            metadata={"user_id": request.user_id},
+            success_url=f"{APP_URL}/?success=true&user_id={request.user_id}",
+            cancel_url=f"{APP_URL}/?canceled=true&user_id={request.user_id}",
+            metadata={"user_id": request.user_id, "plan": request.plan},
         )
         
         logger.info(f"Created checkout session for user {request.user_id}")
@@ -203,7 +361,12 @@ async def create_subscription_checkout(request: CreateCheckoutRequest):
 async def get_subscription_status(user_id: str):
     """Get current subscription status for a user"""
     try:
-        # Find subscription in database
+        # Google Play subscription takes priority
+        google_play_status = await _get_google_play_status(user_id)
+        if google_play_status:
+            return google_play_status
+
+        # Find Stripe subscription in database
         subscription = await db.subscriptions.find_one({"user_id": user_id})
         
         if not subscription:
@@ -229,9 +392,13 @@ async def get_subscription_status(user_id: str):
                     }}
                 )
                 
+                is_active = stripe_sub.status == "active"
+                stripe_tier = "enterprise" if subscription.get("price_id") == STRIPE_PRICE_ID_ENTERPRISE else "pro"
                 return SubscriptionStatusResponse(
                     user_id=user_id,
-                    is_pro=stripe_sub.status == "active",
+                    is_pro=is_active,
+                    tier=stripe_tier if is_active else "free",
+                    billing_source="stripe",
                     status=stripe_sub.status,
                     subscription_id=stripe_sub.id,
                     current_period_end=stripe_sub.current_period_end,
@@ -241,9 +408,13 @@ async def get_subscription_status(user_id: str):
                 logger.warning(f"Could not fetch Stripe subscription: {e}")
         
         # Return cached status
+        is_active = subscription.get("status") == "active"
+        stripe_tier = "enterprise" if subscription.get("price_id") == STRIPE_PRICE_ID_ENTERPRISE else "pro"
         return SubscriptionStatusResponse(
             user_id=user_id,
-            is_pro=subscription.get("status") == "active",
+            is_pro=is_active,
+            tier=stripe_tier if is_active else "free",
+            billing_source="stripe",
             status=subscription.get("status", "none"),
             subscription_id=subscription.get("stripe_subscription_id"),
             current_period_end=subscription.get("current_period_end"),
@@ -381,7 +552,10 @@ async def health_check():
     return {
         "status": "healthy",
         "stripe_configured": bool(stripe.api_key),
-        "price_id": STRIPE_PRICE_ID if stripe.api_key else None
+        "price_id": STRIPE_PRICE_ID_PRO if stripe.api_key else None,
+        "google_play_configured": bool(GOOGLE_SERVICE_ACCOUNT_JSON),
+        "google_play_package": GOOGLE_PLAY_PACKAGE_NAME,
+        "google_play_products": list(GOOGLE_PLAY_PRODUCT_TIERS.keys()),
     }
 
 

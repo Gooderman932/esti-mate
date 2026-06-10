@@ -2,7 +2,7 @@
   "expo": {
     "name": "Esti-Mate Pro",
     "slug": "esti-mate",
-    "version": "1.1.5",
+    "version": "1.1.6",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "estimateapp",
@@ -12,7 +12,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.poordudeholdings.estimatemobile",
-      "buildNumber": "101",
+      "buildNumber": "102",
       "infoPlist": {
         "NSCameraUsageDescription": "Scan documents for estimates and invoices",
         "NSPhotoLibraryUsageDescription": "Select document photos for estimates"
@@ -20,7 +20,7 @@
     },
     "android": {
       "package": "com.poordudeholdings.estimatemobile",
-      "versionCode": 101,
+      "versionCode": 102,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#000"
