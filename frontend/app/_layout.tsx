@@ -1,7 +1,3 @@
-/**
- * App Layout
- */
-
 import React from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -21,11 +17,13 @@ export default function RootLayout() {
             headerShadowVisible: false,
           }}
         >
+          <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="estimate/[id]" options={{ title: 'Document', headerBackTitle: 'Back' }} />
+          <Stack.Screen name="customers/[id]" options={{ title: 'Customer', headerBackTitle: 'Back' }} />
           <Stack.Screen name="materials/index" options={{ title: 'Materials Catalog', headerBackTitle: 'Back' }} />
           <Stack.Screen name="materials/[id]" options={{ title: 'Edit Material', headerBackTitle: 'Back' }} />
-          <Stack.Screen name="paywall" options={{ title: 'Upgrade to Pro', headerBackTitle: 'Back', presentation: 'modal' }} />
+          <Stack.Screen name="paywall" options={{ title: 'Upgrade', headerBackTitle: 'Back', presentation: 'modal' }} />
           <Stack.Screen name="settings" options={{ title: 'Settings', headerBackTitle: 'Back' }} />
           <Stack.Screen name="auto-measure" options={{ title: 'Auto Measure', headerShown: false, presentation: 'fullScreenModal' }} />
           <Stack.Screen name="measure-settings" options={{ title: 'Measure Settings', headerBackTitle: 'Back', headerStyle: { backgroundColor: '#000' }, headerTintColor: '#fff' }} />

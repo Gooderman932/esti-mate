@@ -2,28 +2,28 @@
   "expo": {
     "name": "Esti-Mate Pro",
     "slug": "esti-mate",
-    "version": "1.1.6",
+    "version": "1.1.7",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "estimateapp",
-    "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "owner": "gooderman",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "com.poordudeholdings.estimatemobile",
-      "buildNumber": "102",
+      "buildNumber": "103",
       "infoPlist": {
-        "NSCameraUsageDescription": "Scan documents for estimates and invoices",
-        "NSPhotoLibraryUsageDescription": "Select document photos for estimates"
+        "NSCameraUsageDescription": "Take photos of job sites for measurements and estimates",
+        "NSPhotoLibraryUsageDescription": "Select photos for estimates and invoices"
       }
     },
     "android": {
       "package": "com.poordudeholdings.estimatemobile",
-      "versionCode": 102,
+      "versionCode": 103,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#000"
+        "backgroundColor": "#007AFF"
       },
       "edgeToEdgeEnabled": true,
       "permissions": [
@@ -46,7 +46,7 @@
           "image": "./assets/images/splash-image.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#000"
+          "backgroundColor": "#000000"
         }
       ],
       "./plugins/withRNIAP"
