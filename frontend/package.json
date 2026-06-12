@@ -8,7 +8,9 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "build:android": "EAS_SKIP_AUTO_FINGERPRINT=1 eas build --platform android --profile production",
+    "build:preview": "EAS_SKIP_AUTO_FINGERPRINT=1 eas build --platform android --profile preview"
   },
   "dependencies": {
     "@babel/runtime": "^7.20.6",
