@@ -29,15 +29,26 @@ import stripe
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# MongoDB connection
-mongo_url = os.environ['MONGO_URL']
+# MongoDB connection. Use .get() + explicit checks so a missing env var fails
+# fast with a clear message rather than raising KeyError at import time.
+mongo_url = os.environ.get('MONGO_URL')
+db_name = os.environ.get('DB_NAME')
+if not mongo_url or not db_name:
+    raise SystemExit(
+        "MONGO_URL and DB_NAME environment variables must be set. "
+        "Copy backend/.env.example to backend/.env and fill in values."
+    )
 client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+db = client[db_name]
 
 # Stripe configuration
 stripe.api_key = os.environ.get('STRIPE_SECRET_KEY', '')
 STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
 STRIPE_PRICE_ID = os.environ.get('STRIPE_PRICE_ID', 'price_PLACEHOLDER')
+# Public URL used for Stripe checkout success/cancel redirects. Override per
+# environment via env. The previous hard-coded `measure-build-3.preview.emergentagent.com`
+# host was specific to the original Emergent preview deployment.
+PUBLIC_APP_URL = os.environ.get('PUBLIC_APP_URL', 'http://localhost:3000').rstrip('/')
 
 # Create the main app
 app = FastAPI(title="Construction Estimator API")
@@ -177,8 +188,8 @@ async def create_subscription_checkout(request: CreateCheckoutRequest):
                 "price": STRIPE_PRICE_ID,
                 "quantity": 1,
             }],
-            success_url="https://measure-build-3.preview.emergentagent.com/?success=true",
-            cancel_url="https://measure-build-3.preview.emergentagent.com/?canceled=true",
+            success_url=f"{PUBLIC_APP_URL}/?success=true",
+            cancel_url=f"{PUBLIC_APP_URL}/?canceled=true",
             metadata={"user_id": request.user_id},
         )
         

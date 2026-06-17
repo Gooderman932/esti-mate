@@ -26,6 +26,31 @@ export interface LineItem {
   unitPrice: number;
   unit: string;
   notes: string;
+  /**
+   * Optional human-readable measurement description (e.g. "12 ft x 8 ft")
+   * captured from the in-app measurement tool. Rendered next to the line item
+   * in the estimate detail screen and PDF.
+   */
+  measurement?: string;
+}
+
+// Single point in image-space coordinates for corner selection / measurement.
+export interface Point {
+  x: number;
+  y: number;
+}
+
+/**
+ * A user-captured document photo (e.g. a job-site sketch or blueprint snap).
+ * The four corners describe the user-selected quadrilateral that the
+ * perspective-corrected preview is built from.
+ */
+export interface DocumentImage {
+  uri: string;                // raw source uri (data: or file:)
+  originalWidth: number;
+  originalHeight: number;
+  corners?: Point[];          // user-picked corners in image coords
+  correctedUri?: string;      // perspective-corrected output, if generated
 }
 
 // Customer information
@@ -57,6 +82,8 @@ export interface Estimate {
   notes: string;
   status: 'draft' | 'sent' | 'accepted' | 'paid';
   taxRate: number; // Per-document tax rate
+  /** Optional captured document photo attached to this estimate. */
+  documentImage?: DocumentImage;
 }
 
 // Subscription status

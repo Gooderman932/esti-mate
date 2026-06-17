@@ -133,7 +133,11 @@ export function generatePdfHtml(estimate: Estimate, settings: AppSettings, isPro
   `;
 }
 
-export async function generatePdf(estimate: Estimate, settings: AppSettings, isPro: boolean): Promise<string> {
+export async function generatePdf(
+  estimate: Estimate,
+  settings: AppSettings,
+  isPro: boolean = false,
+): Promise<string> {
   try {
     const html = generatePdfHtml(estimate, settings, isPro);
     const { uri } = await Print.printToFileAsync({ html });
@@ -160,7 +164,11 @@ export async function sharePdf(uri: string, estimate: Estimate): Promise<void> {
   }
 }
 
-export async function printPdf(estimate: Estimate, settings: AppSettings, isPro: boolean): Promise<void> {
+export async function printPdf(
+  estimate: Estimate,
+  settings: AppSettings,
+  isPro: boolean = false,
+): Promise<void> {
   try {
     const html = generatePdfHtml(estimate, settings, isPro);
     await Print.printAsync({ html });

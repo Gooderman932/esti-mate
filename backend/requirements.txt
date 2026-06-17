@@ -17,7 +17,6 @@ distro==1.9.0
 dnspython==2.8.0
 ecdsa==0.19.1
 email-validator==2.3.0
-emergentintegrations==0.1.0
 fastapi==0.110.1
 fastuuid==0.14.0
 filelock==3.20.3
@@ -27,7 +26,7 @@ fsspec==2026.1.0
 google-ai-generativelanguage==0.6.15
 google-api-core==2.29.0
 google-api-python-client==2.189.0
-google-auth==2.49.0.dev0
+google-auth==2.49.0
 google-auth-httplib2==0.3.0
 google-genai==1.62.0
 google-generativeai==0.8.6
