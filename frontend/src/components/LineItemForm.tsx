@@ -89,9 +89,11 @@ export default function LineItemForm({ item, onSave, onCancel }: LineItemFormPro
     
     const lineItem: LineItem = {
       id: item?.id || generateId(),
+      materialId: item?.materialId,
       description: description.trim(),
       quantity: parseFloat(quantity) || 1,
       unitPrice: parseFloat(unitPrice) || 0,
+      unit: item?.unit || 'each',
       measurement: measurement.trim(),
       notes: notes.trim(),
     };

@@ -4,23 +4,50 @@
     "appVersionSource": "local"
   },
   "build": {
-    "production": {
+    "development": {
+      "developmentClient": true,
+      "distribution": "internal",
       "env": {
-        "EAS_SKIP_AUTO_FINGERPRINT": "1"
+        "EXPO_PUBLIC_API_BASE_URL": "http://localhost:8000"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "channel": "preview",
+      "ios": {
+        "simulator": false
+      },
+      "android": {
+        "buildType": "apk",
+        "autoIncrement": false
+      },
+      "env": {
+        "EAS_SKIP_AUTO_FINGERPRINT": "1",
+        "EXPO_PUBLIC_API_BASE_URL": "https://api-staging.estimate.example.com"
+      }
+    },
+    "production": {
+      "channel": "production",
+      "env": {
+        "EAS_SKIP_AUTO_FINGERPRINT": "1",
+        "EXPO_PUBLIC_API_BASE_URL": "https://api.estimate.example.com"
       },
       "android": {
         "buildType": "app-bundle",
         "autoIncrement": false
       }
-    },
-    "preview": {
-      "distribution": "internal",
-      "env": {
-        "EAS_SKIP_AUTO_FINGERPRINT": "1"
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "REPLACE_WITH_APPLE_ID",
+        "ascAppId": "REPLACE_WITH_APP_STORE_CONNECT_APP_ID",
+        "appleTeamId": "REPLACE_WITH_APPLE_TEAM_ID"
       },
       "android": {
-        "buildType": "apk",
-        "autoIncrement": false
+        "serviceAccountKeyPath": "./play-service-account.json",
+        "track": "internal"
       }
     }
   }
