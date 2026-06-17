@@ -97,3 +97,12 @@ android-sdk/ -e
 # Environment files
 *.env
 *.env.*
+.env
+.env.*
+!.env.example
+*.key
+*.pfx
+*.p12
+*.db
+*.sqlite
+*.sqlite3

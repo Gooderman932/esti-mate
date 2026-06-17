@@ -302,10 +302,15 @@ async def cancel_subscription(user_id: str):
 
 @api_router.post("/webhooks/stripe")
 async def handle_stripe_webhook(request: Request):
-    """Handle Stripe webhook events"""
+    """Handle Stripe webhook events.
+
+    Fail closed: if `STRIPE_WEBHOOK_SECRET` is unset we cannot verify the
+    request signature, so we refuse with HTTP 503. Previously we returned
+    200 OK, which silently accepted unverified payloads.
+    """
     if not STRIPE_WEBHOOK_SECRET:
-        logger.warning("Webhook secret not configured")
-        return {"status": "webhook_secret_not_configured"}
+        logger.error("Webhook secret not configured — refusing request")
+        raise HTTPException(status_code=503, detail="Webhook secret not configured")
     
     body = await request.body()
     sig_header = request.headers.get("stripe-signature")

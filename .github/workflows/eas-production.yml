@@ -1,0 +1,32 @@
+name: EAS Production Build
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform to build'
+        type: choice
+        options: [android, ios, all]
+        default: android
+
+jobs:
+  production:
+    runs-on: ubuntu-latest
+    if: ${{ secrets.EXPO_TOKEN != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install Expo CLI + eas-cli
+        run: npm i -g eas-cli @expo/cli
+      - name: Install deps
+        working-directory: frontend
+        run: npm ci
+      - name: Build production
+        working-directory: frontend
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: eas build --profile production --platform ${{ github.event.inputs.platform }} --non-interactive --no-wait

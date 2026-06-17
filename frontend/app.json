@@ -1,21 +1,24 @@
 {
   "expo": {
-    "name": "DocScanner",
-    "slug": "frontend",
+    "name": "Esti-mate",
+    "slug": "esti-mate",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "frontend",
+    "scheme": "estimate",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.poordudeholdings.estimate",
       "infoPlist": {
         "NSCameraUsageDescription": "Scan documents for estimates and invoices",
         "NSPhotoLibraryUsageDescription": "Select document photos for estimates"
       }
     },
     "android": {
+      "package": "com.poordudeholdings.estimate",
+      "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#000"
@@ -46,6 +49,12 @@
     ],
     "experiments": {
       "typedRoutes": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "REPLACE_WITH_EAS_PROJECT_ID"
+      }
+    },
+    "owner": "REPLACE_WITH_EAS_OWNER"
   }
 }
