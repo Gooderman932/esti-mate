@@ -207,3 +207,13 @@ export async function getActiveEstimatesCount(): Promise<number> {
   const estimates = await getEstimates();
   return estimates.filter(e => e.status !== 'paid').length;
 }
+
+// Count estimates + invoices created in the current calendar month (for tier limits)
+export async function getDocumentsCreatedThisMonth(): Promise<number> {
+  const estimates = await getEstimates();
+  const now = new Date();
+  return estimates.filter(e => {
+    const created = new Date(e.createdAt);
+    return created.getFullYear() === now.getFullYear() && created.getMonth() === now.getMonth();
+  }).length;
+}

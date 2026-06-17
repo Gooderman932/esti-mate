@@ -1,30 +1,36 @@
 {
   "expo": {
-    "name": "DocScanner",
-    "slug": "frontend",
-    "version": "1.0.0",
+    "name": "Esti-Mate Pro",
+    "slug": "esti-mate",
+    "version": "1.1.7",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "frontend",
-    "userInterfaceStyle": "automatic",
+    "scheme": "estimateapp",
+    "owner": "gooderman",
+    "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
+      "bundleIdentifier": "com.poordudeholdings.estimatemobile",
+      "buildNumber": "103",
       "infoPlist": {
-        "NSCameraUsageDescription": "Scan documents for estimates and invoices",
-        "NSPhotoLibraryUsageDescription": "Select document photos for estimates"
+        "NSCameraUsageDescription": "Take photos of job sites for measurements and estimates",
+        "NSPhotoLibraryUsageDescription": "Select photos for estimates and invoices"
       }
     },
     "android": {
+      "package": "com.poordudeholdings.estimatemobile",
+      "versionCode": 103,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#000"
+        "backgroundColor": "#007AFF"
       },
       "edgeToEdgeEnabled": true,
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.WRITE_EXTERNAL_STORAGE"
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "com.android.vending.BILLING"
       ]
     },
     "web": {
@@ -37,15 +43,22 @@
       [
         "expo-splash-screen",
         {
-          "image": "./assets/images/splash-icon.png",
+          "image": "./assets/images/splash-image.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#000"
+          "backgroundColor": "#000000"
         }
-      ]
+      ],
+      "./plugins/withRNIAP"
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "apiUrl": "",
+      "eas": {
+        "projectId": "7c643dce-d1d5-4011-b6f7-a976a7deb2e7"
+      }
     }
   }
 }

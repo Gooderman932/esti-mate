@@ -46,7 +46,7 @@ export function generatePdfHtml(estimate: Estimate, settings: AppSettings, isPro
         <strong>${escapeHtml(item.description)}</strong>
         ${item.notes ? `<br><small style="color: #888;">${escapeHtml(item.notes)}</small>` : ''}
       </td>
-      <td style="text-align: center;">${item.quantity} ${item.unit}</td>
+      <td style="text-align: center;">${item.quantity} ${item.unit || ''}</td>
       <td style="text-align: right;">${formatCurrency(item.unitPrice)}</td>
       <td style="text-align: right;">${formatCurrency(calculateLineTotal(item))}</td>
     </tr>
@@ -204,7 +204,7 @@ export function generateTextExport(estimate: Estimate, settings: AppSettings): s
   
   lineItems.forEach((item, index) => {
     text += `${index + 1}. ${item.description}\n`;
-    text += `   ${item.quantity} ${item.unit} x ${formatCurrency(item.unitPrice)} = ${formatCurrency(calculateLineTotal(item))}\n`;
+    text += `   ${item.quantity} ${item.unit || ''} x ${formatCurrency(item.unitPrice)} = ${formatCurrency(calculateLineTotal(item))}\n`;
     if (item.notes) text += `   Note: ${item.notes}\n`;
     text += '\n';
   });

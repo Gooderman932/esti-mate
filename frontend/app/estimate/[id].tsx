@@ -36,10 +36,12 @@ import { calculateLineTotal, calculateSubtotal, calculateTax, calculateGrandTota
 import { generatePdf, sharePdf, printPdf } from '../../src/utils/pdfGenerator';
 import CornerSelector from '../../src/components/CornerSelector';
 import LineItemForm from '../../src/components/LineItemForm';
+import { useSubscription } from '../../src/SubscriptionContext';
 
 export default function EstimateDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
+  const { canUploadLogo } = useSubscription();
   
   const [estimate, setEstimate] = useState<Estimate | null>(null);
   const [settings, setSettings] = useState<AppSettings | null>(null);
@@ -301,7 +303,7 @@ export default function EstimateDetailScreen() {
     
     try {
       setExporting(true);
-      const pdfUri = await generatePdf(estimate, settings);
+      const pdfUri = await generatePdf(estimate, settings, canUploadLogo);
       await sharePdf(pdfUri, estimate);
     } catch (error) {
       console.error('PDF export error:', error);
@@ -317,7 +319,7 @@ export default function EstimateDetailScreen() {
     
     try {
       setExporting(true);
-      await printPdf(estimate, settings);
+      await printPdf(estimate, settings, canUploadLogo);
     } catch (error) {
       console.error('Print error:', error);
       Alert.alert('Error', 'Failed to print. Please try again.');

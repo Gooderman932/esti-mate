@@ -1,0 +1,27 @@
+{
+  "cli": {
+    "version": ">= 12.0.0",
+    "appVersionSource": "local"
+  },
+  "build": {
+    "production": {
+      "env": {
+        "EAS_SKIP_AUTO_FINGERPRINT": "1"
+      },
+      "android": {
+        "buildType": "app-bundle",
+        "autoIncrement": false
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "env": {
+        "EAS_SKIP_AUTO_FINGERPRINT": "1"
+      },
+      "android": {
+        "buildType": "apk",
+        "autoIncrement": false
+      }
+    }
+  }
+}
