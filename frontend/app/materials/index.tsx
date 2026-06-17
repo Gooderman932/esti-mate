@@ -280,7 +280,7 @@ export default function MaterialsScreen() {
               <View style={styles.field}>
                 <Text style={styles.label}>Store Link (optional)</Text>
                 <TextInput style={styles.input} value={storeLink} onChangeText={setStoreLink} placeholder="https://www.homedepot.com/..." autoCapitalize="none" keyboardType="url" placeholderTextColor="#999" />
-                <Text style={styles.hint}>Paste a link to Lowe's, Home Depot, etc.</Text>
+                <Text style={styles.hint}>Paste a link to Lowe&apos;s, Home Depot, etc.</Text>
               </View>
             </ScrollView>
           </KeyboardAvoidingView>

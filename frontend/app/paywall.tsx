@@ -94,7 +94,7 @@ export default function PaywallScreen() {
       <SafeAreaView style={styles.container} edges={['bottom']}>
         <View style={styles.alreadyPro}>
           <Ionicons name="checkmark-circle" size={64} color="#34C759" />
-          <Text style={styles.alreadyProTitle}>You're a Pro!</Text>
+          <Text style={styles.alreadyProTitle}>You&apos;re a Pro!</Text>
           <Text style={styles.alreadyProSubtitle}>You have access to all Pro features</Text>
           <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
             <Text style={styles.backButtonText}>Go Back</Text>
