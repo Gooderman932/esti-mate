@@ -1,8 +1,26 @@
 /**
  * Enhanced Types for Construction Estimator App
- * 
- * Includes Materials Catalog, Estimates, and Subscription types
+ *
+ * Includes Materials Catalog, Estimates, Subscription, and image/measurement types.
  */
+
+// 2-D point used for corner selection and on-image measurement overlays
+export interface Point {
+  x: number;
+  y: number;
+}
+
+// Captured/imported document image + optional perspective-corrected variant
+export interface DocumentImage {
+  uri: string;
+  correctedUri?: string;
+  corners?: Point[];
+  width?: number;
+  height?: number;
+  originalWidth?: number;
+  originalHeight?: number;
+  capturedAt?: string;
+}
 
 // Material in the catalog
 export interface Material {
@@ -26,6 +44,9 @@ export interface LineItem {
   unitPrice: number;
   unit: string;
   notes: string;
+  // Optional human-readable measurement string captured from the overlay tool
+  // (e.g. "12'6\" x 8'0\" = 100 sq ft"). Optional so legacy items remain valid.
+  measurement?: string;
 }
 
 // Customer information
@@ -57,6 +78,8 @@ export interface Estimate {
   notes: string;
   status: 'draft' | 'sent' | 'accepted' | 'paid';
   taxRate: number; // Per-document tax rate
+  // Optional photo/scan attached to the estimate (e.g. site photo, sketch)
+  documentImage?: DocumentImage | null;
 }
 
 // Subscription status

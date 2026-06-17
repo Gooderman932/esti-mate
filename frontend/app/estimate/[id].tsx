@@ -180,12 +180,12 @@ export default function EstimateDetailScreen() {
       // For simplicity, we crop to the bounding box of the selected corners
       // Full perspective transform would require native modules
       if (tempImage.corners && tempImage.corners.length === 4) {
-        const xs = tempImage.corners.map(c => c.x);
-        const ys = tempImage.corners.map(c => c.y);
+        const xs = tempImage.corners.map((c: Point) => c.x);
+        const ys = tempImage.corners.map((c: Point) => c.y);
         const minX = Math.max(0, Math.min(...xs));
-        const maxX = Math.min(tempImage.originalWidth, Math.max(...xs));
+        const maxX = Math.min(tempImage.originalWidth ?? Infinity, Math.max(...xs));
         const minY = Math.max(0, Math.min(...ys));
-        const maxY = Math.min(tempImage.originalHeight, Math.max(...ys));
+        const maxY = Math.min(tempImage.originalHeight ?? Infinity, Math.max(...ys));
         
         const cropWidth = maxX - minX;
         const cropHeight = maxY - minY;
@@ -301,7 +301,9 @@ export default function EstimateDetailScreen() {
     
     try {
       setExporting(true);
-      const pdfUri = await generatePdf(estimate, settings);
+      // TODO: wire real subscription status; default to free tier for now
+      const isPro = false;
+      const pdfUri = await generatePdf(estimate, settings, isPro);
       await sharePdf(pdfUri, estimate);
     } catch (error) {
       console.error('PDF export error:', error);
@@ -317,7 +319,9 @@ export default function EstimateDetailScreen() {
     
     try {
       setExporting(true);
-      await printPdf(estimate, settings);
+      // TODO: wire real subscription status; default to free tier for now
+      const isPro = false;
+      await printPdf(estimate, settings, isPro);
     } catch (error) {
       console.error('Print error:', error);
       Alert.alert('Error', 'Failed to print. Please try again.');
@@ -597,8 +601,8 @@ export default function EstimateDetailScreen() {
           <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }}>
             <CornerSelector
               imageUri={tempImage.uri}
-              imageWidth={tempImage.originalWidth}
-              imageHeight={tempImage.originalHeight}
+              imageWidth={tempImage.originalWidth ?? tempImage.width ?? 0}
+              imageHeight={tempImage.originalHeight ?? tempImage.height ?? 0}
               initialCorners={tempImage.corners}
               onCornersChange={(corners) => {
                 setTempImage({ ...tempImage, corners });
