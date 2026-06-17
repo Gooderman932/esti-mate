@@ -16,6 +16,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Image,
+  Linking,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -29,7 +30,7 @@ const API_URL = Constants.expoConfig?.extra?.apiUrl || process.env.EXPO_PUBLIC_B
 
 export default function SettingsScreen() {
   const router = useRouter();
-  const { isPro, settings, updateSettings, checkSubscription, subscriptionStatus, userId } = useSubscription();
+  const { isPro, isEnterprise, canUploadLogo, settings, updateSettings, checkSubscription, subscriptionStatus, userId } = useSubscription();
 
   const [businessName, setBusinessName] = useState('');
   const [businessEmail, setBusinessEmail] = useState('');
@@ -60,7 +61,7 @@ export default function SettingsScreen() {
         email: businessEmail.trim(),
         phone: businessPhone.trim(),
         address: businessAddress.trim(),
-        logoBase64: isPro ? logoBase64 : undefined, // Only save logo if Pro
+        logoBase64: canUploadLogo ? logoBase64 : undefined, // Logo is an Enterprise feature
       },
       defaultTaxRate: parseFloat(defaultTaxRate) || 0,
     };
@@ -71,10 +72,10 @@ export default function SettingsScreen() {
   };
 
   const handlePickLogo = async () => {
-    if (!isPro) {
+    if (!canUploadLogo) {
       Alert.alert(
-        'Pro Feature',
-        'Upload a custom logo with Pro subscription',
+        'Enterprise Feature',
+        'Upload a custom logo with an Enterprise subscription',
         [
           { text: 'Cancel', style: 'cancel' },
           { text: 'Upgrade', onPress: () => router.push('/paywall') },
@@ -109,9 +110,17 @@ export default function SettingsScreen() {
   };
 
   const handleCancelSubscription = async () => {
+    // Google Play subscriptions are managed in the Play Store, not by our backend
+    if (subscriptionStatus?.billingSource === 'google_play') {
+      Linking.openURL(
+        'https://play.google.com/store/account/subscriptions?package=com.poordudeholdings.estimatemobile'
+      ).catch(() => Alert.alert('Error', 'Could not open Google Play subscriptions.'));
+      return;
+    }
+
     Alert.alert(
       'Cancel Subscription',
-      'Are you sure you want to cancel your Pro subscription? You will keep access until the end of your billing period.',
+      'Are you sure you want to cancel your subscription? You will keep access until the end of your billing period.',
       [
         { text: 'Keep Subscription', style: 'cancel' },
         {
@@ -148,8 +157,10 @@ export default function SettingsScreen() {
               {isPro ? (
                 <>
                   <View style={styles.proStatus}>
-                    <Ionicons name="checkmark-circle" size={24} color="#34C759" />
-                    <Text style={styles.proStatusText}>Pro Active</Text>
+                    <Ionicons name="checkmark-circle" size={24} color={isEnterprise ? '#007AFF' : '#34C759'} />
+                    <Text style={[styles.proStatusText, isEnterprise && { color: '#007AFF' }]}>
+                      {isEnterprise ? 'Enterprise Active' : 'Pro Active'}
+                    </Text>
                   </View>
                   {subscriptionStatus?.currentPeriodEnd && (
                     <Text style={styles.renewalText}>
@@ -160,7 +171,11 @@ export default function SettingsScreen() {
                   )}
                   {!subscriptionStatus?.cancelAtPeriodEnd && (
                     <TouchableOpacity style={styles.cancelButton} onPress={handleCancelSubscription}>
-                      <Text style={styles.cancelButtonText}>Cancel Subscription</Text>
+                      <Text style={styles.cancelButtonText}>
+                        {subscriptionStatus?.billingSource === 'google_play'
+                          ? 'Manage in Google Play'
+                          : 'Cancel Subscription'}
+                      </Text>
                     </TouchableOpacity>
                   )}
                 </>
@@ -181,7 +196,7 @@ export default function SettingsScreen() {
             
             {/* Logo */}
             <View style={styles.logoSection}>
-              <Text style={styles.label}>Company Logo {!isPro && <Text style={styles.proTag}>(Pro)</Text>}</Text>
+              <Text style={styles.label}>Company Logo {!canUploadLogo && <Text style={styles.proTag}>(Enterprise)</Text>}</Text>
               {logoBase64 ? (
                 <View style={styles.logoPreview}>
                   <Image source={{ uri: logoBase64 }} style={styles.logoImage} resizeMode="contain" />
@@ -191,9 +206,9 @@ export default function SettingsScreen() {
                 </View>
               ) : (
                 <TouchableOpacity style={styles.logoPlaceholder} onPress={handlePickLogo}>
-                  <Ionicons name="image-outline" size={32} color={isPro ? '#007AFF' : '#ccc'} />
-                  <Text style={[styles.logoPlaceholderText, !isPro && { color: '#ccc' }]}>
-                    {isPro ? 'Tap to add logo' : 'Upgrade to add logo'}
+                  <Ionicons name="image-outline" size={32} color={canUploadLogo ? '#007AFF' : '#ccc'} />
+                  <Text style={[styles.logoPlaceholderText, !canUploadLogo && { color: '#ccc' }]}>
+                    {canUploadLogo ? 'Tap to add logo' : 'Upgrade to Enterprise to add logo'}
                   </Text>
                 </TouchableOpacity>
               )}

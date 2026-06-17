@@ -1,7 +1,7 @@
 {
   "cli": {
-    "version": ">= 7.0.0",
-    "appVersionSource": "remote"
+    "version": ">= 12.0.0",
+    "appVersionSource": "local"
   },
   "build": {
     "development": {
@@ -18,17 +18,23 @@
         "simulator": false
       },
       "android": {
-        "buildType": "apk"
+        "buildType": "apk",
+        "autoIncrement": false
       },
       "env": {
+        "EAS_SKIP_AUTO_FINGERPRINT": "1",
         "EXPO_PUBLIC_API_BASE_URL": "https://api-staging.estimate.example.com"
       }
     },
     "production": {
       "channel": "production",
-      "autoIncrement": true,
       "env": {
+        "EAS_SKIP_AUTO_FINGERPRINT": "1",
         "EXPO_PUBLIC_API_BASE_URL": "https://api.estimate.example.com"
+      },
+      "android": {
+        "buildType": "app-bundle",
+        "autoIncrement": false
       }
     }
   },
