@@ -217,3 +217,67 @@ export async function getDocumentsCreatedThisMonth(): Promise<number> {
     return created.getFullYear() === now.getFullYear() && created.getMonth() === now.getMonth();
   }).length;
 }
+
+// ========== CUSTOMERS ==========
+
+import { Customer } from '../types';
+
+const CUSTOMER_KEY = '@estimator_customers';
+
+export async function getCustomers(): Promise<Customer[]> {
+  try {
+    const json = await AsyncStorage.getItem(CUSTOMER_KEY);
+    const list: Customer[] = json ? JSON.parse(json) : [];
+    return list.sort((a, b) => a.name.localeCompare(b.name));
+  } catch (error) {
+    console.error('Error loading customers:', error);
+    return [];
+  }
+}
+
+export async function getCustomerById(id: string): Promise<Customer | null> {
+  const customers = await getCustomers();
+  return customers.find(c => c.id === id) ?? null;
+}
+
+// addCustomer accepts a full Customer object (id/createdAt/updatedAt supplied
+// by the caller). For convenience it also accepts a partial without id and
+// will fill in id+timestamps; this matches the two call sites in the app.
+export async function addCustomer(customer: Customer): Promise<Customer>;
+export async function addCustomer(
+  data: Omit<Customer, 'id' | 'createdAt' | 'updatedAt'>,
+): Promise<Customer>;
+export async function addCustomer(
+  input: Customer | Omit<Customer, 'id' | 'createdAt' | 'updatedAt'>,
+): Promise<Customer> {
+  const now = new Date().toISOString();
+  const customer: Customer = 'id' in input && (input as Customer).id
+    ? (input as Customer)
+    : { ...(input as Omit<Customer, 'id' | 'createdAt' | 'updatedAt'>), id: generateId(), createdAt: now, updatedAt: now };
+  const customers = await getCustomers();
+  customers.push(customer);
+  await AsyncStorage.setItem(CUSTOMER_KEY, JSON.stringify(customers));
+  return customer;
+}
+
+// updateCustomer accepts either (id, patch) or a full Customer object whose
+// id is used to locate the existing record.
+export async function updateCustomer(
+  idOrCustomer: string | Customer,
+  patch?: Partial<Omit<Customer, 'id' | 'createdAt'>>,
+): Promise<Customer | null> {
+  const customers = await getCustomers();
+  const id = typeof idOrCustomer === 'string' ? idOrCustomer : idOrCustomer.id;
+  const patchObj = typeof idOrCustomer === 'string' ? patch ?? {} : idOrCustomer;
+  const i = customers.findIndex(c => c.id === id);
+  if (i === -1) return null;
+  customers[i] = { ...customers[i], ...patchObj, id, updatedAt: new Date().toISOString() };
+  await AsyncStorage.setItem(CUSTOMER_KEY, JSON.stringify(customers));
+  return customers[i];
+}
+
+export async function deleteCustomer(id: string): Promise<void> {
+  const customers = await getCustomers();
+  const filtered = customers.filter(c => c.id !== id);
+  await AsyncStorage.setItem(CUSTOMER_KEY, JSON.stringify(filtered));
+}

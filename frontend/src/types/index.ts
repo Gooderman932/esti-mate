@@ -35,21 +35,6 @@ export interface Material {
   updatedAt: string;
 }
 
-// Point on a captured document image
-export interface Point {
-  x: number;
-  y: number;
-}
-
-// Scanned/photographed document attached to an estimate
-export interface DocumentImage {
-  uri: string;
-  correctedUri?: string;
-  corners?: Point[];
-  originalWidth: number;
-  originalHeight: number;
-}
-
 // Line item on an estimate/invoice
 export interface LineItem {
   id: string;
@@ -62,6 +47,19 @@ export interface LineItem {
   // Optional human-readable measurement string captured from the overlay tool
   // (e.g. "12'6\" x 8'0\" = 100 sq ft"). Optional so legacy items remain valid.
   measurement?: string;
+}
+
+// Persistent customer record stored in the local customer book. CustomerInfo
+// below is the snapshot copied onto an individual estimate.
+export interface Customer {
+  id: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  address?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // Customer information

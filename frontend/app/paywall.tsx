@@ -24,7 +24,7 @@ import Constants from 'expo-constants';
 import { useSubscription } from '../src/SubscriptionContext';
 import { TIER_LIMITS, TIER_PRICES } from '../src/types';
 
-const API_URL = Constants.expoConfig?.extra?.apiUrl || process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const API_URL = Constants.expoConfig?.extra?.apiUrl || process.env.EXPO_PUBLIC_API_BASE_URL || '';
 const SUPPORT_EMAIL = 'admin@poordudeholdings.com';
 
 type Plan = 'pro' | 'enterprise';

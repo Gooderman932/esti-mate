@@ -26,7 +26,7 @@ import { useSubscription } from '../src/SubscriptionContext';
 import { AppSettings } from '../src/types';
 import Constants from 'expo-constants';
 
-const API_URL = Constants.expoConfig?.extra?.apiUrl || process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const API_URL = Constants.expoConfig?.extra?.apiUrl || process.env.EXPO_PUBLIC_API_BASE_URL || '';
 
 export default function SettingsScreen() {
   const router = useRouter();

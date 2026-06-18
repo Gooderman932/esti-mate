@@ -26,7 +26,7 @@ import {
   TIER_LIMITS,
 } from './types';
 
-const API_URL = Constants.expoConfig?.extra?.apiUrl || process.env.EXPO_PUBLIC_BACKEND_URL || '';
+const API_URL = Constants.expoConfig?.extra?.apiUrl || process.env.EXPO_PUBLIC_API_BASE_URL || '';
 
 interface MonthlyUsage {
   used: number;

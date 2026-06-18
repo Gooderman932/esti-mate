@@ -34,10 +34,17 @@ import stripe
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# MongoDB connection
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+# MongoDB connection — explicit env validation so missing vars fail with a
+# readable message instead of a KeyError at import time.
+MONGO_URL = os.environ.get('MONGO_URL')
+DB_NAME = os.environ.get('DB_NAME')
+if not MONGO_URL or not DB_NAME:
+    raise SystemExit(
+        "MONGO_URL and DB_NAME environment variables are required. "
+        "Copy backend/.env.example to backend/.env and fill them in."
+    )
+client = AsyncIOMotorClient(MONGO_URL)
+db = client[DB_NAME]
 
 # Stripe configuration
 stripe.api_key = os.environ.get('STRIPE_SECRET_KEY', '')
@@ -45,7 +52,7 @@ STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
 STRIPE_PRICE_ID = os.environ.get('STRIPE_PRICE_ID', 'price_PLACEHOLDER')
 STRIPE_PRICE_ID_PRO = os.environ.get('STRIPE_PRICE_ID_PRO', STRIPE_PRICE_ID)
 STRIPE_PRICE_ID_ENTERPRISE = os.environ.get('STRIPE_PRICE_ID_ENTERPRISE', '')
-APP_URL = os.environ.get('APP_URL', 'https://measure-build-3.preview.emergentagent.com')
+APP_URL = os.environ.get('APP_URL', 'http://localhost:3000')
 
 # Google Play configuration
 GOOGLE_PLAY_PACKAGE_NAME = os.environ.get('GOOGLE_PLAY_PACKAGE_NAME', 'com.poordudeholdings.estimatemobile')
