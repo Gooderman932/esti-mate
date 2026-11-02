@@ -43,7 +43,7 @@ Stability and dependency updates.
 ## Build (on your computer)
 
 ```bash
-cd ~/esti-mate && git checkout main && git pull
+cd ~/esti-mate && git fetch origin && git checkout release/1.1.8-play-api36 && git pull
 cd frontend && npm ci
 npx expo-doctor
 EAS_SKIP_AUTO_FINGERPRINT=1 eas build --platform android --profile production
@@ -53,6 +53,8 @@ EAS signs with the upload key registered in Play Console
 (App integrity → App signing → Upload key certificate). If Play reports a
 certificate mismatch, check that SHA-1 against `eas credentials -p android`
 before trying anything else.
+
+Merge PR into `main` after the internal-track checks below pass.
 
 ## Play Console steps
 
