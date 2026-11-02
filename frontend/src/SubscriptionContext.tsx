@@ -138,6 +138,11 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     const purchaseToken: string = purchase?.purchaseToken || '';
     if (!purchaseToken || !TIER_FOR_PRODUCT_ID[productId]) return;
 
+    // Pending purchases (e.g. cash/slow payment methods) are not paid yet.
+    // Google requires that we neither grant access nor acknowledge them until
+    // they transition to 'purchased'; the listener fires again when they do.
+    if (purchase?.purchaseState === 'pending') return;
+
     const uid = userIdRef.current;
     const purchasedTier = TIER_FOR_PRODUCT_ID[productId];
 
@@ -180,7 +185,10 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     try {
       const purchases: any[] = await RNIap.getAvailablePurchases();
       const active = purchases.find(
-        (p) => TIER_FOR_PRODUCT_ID[p.productId] && p.purchaseToken
+        (p) =>
+          TIER_FOR_PRODUCT_ID[p.productId] &&
+          p.purchaseToken &&
+          p.purchaseState !== 'pending'
       );
       if (active) {
         // Acknowledge if Play returned it un-acknowledged (e.g. app killed mid-purchase)
@@ -197,6 +205,20 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
           status: 'active',
         });
         return true;
+      }
+
+      // Play returned successfully with no active subscription. If the cached
+      // entitlement came from Google Play, it has expired or been canceled /
+      // refunded, so drop back to the free tier instead of keeping Pro forever.
+      const cached = await getSubscriptionStatus();
+      if (cached?.billingSource === 'google_play' && cached.isPro) {
+        await applyStatus({
+          userId: uid,
+          isPro: false,
+          tier: 'free',
+          billingSource: 'google_play',
+          status: 'canceled',
+        });
       }
     } catch (e) {
       console.warn('Could not sync Play purchases:', e);

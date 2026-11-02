@@ -23,14 +23,14 @@
       },
       "env": {
         "EAS_SKIP_AUTO_FINGERPRINT": "1",
-        "EXPO_PUBLIC_API_BASE_URL": "https://api-staging.estimate.example.com"
+        "EXPO_PUBLIC_API_BASE_URL": ""
       }
     },
     "production": {
       "channel": "production",
       "env": {
         "EAS_SKIP_AUTO_FINGERPRINT": "1",
-        "EXPO_PUBLIC_API_BASE_URL": "https://api.estimate.example.com"
+        "EXPO_PUBLIC_API_BASE_URL": ""
       },
       "android": {
         "buildType": "app-bundle",
