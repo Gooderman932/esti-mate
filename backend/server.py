@@ -19,6 +19,9 @@ Environment Variables Required:
 """
 
 from fastapi import FastAPI, APIRouter, HTTPException, Request
+import hashlib
+import hmac
+import secrets
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -34,10 +37,17 @@ import stripe
 ROOT_DIR = Path(__file__).parent
 load_dotenv(ROOT_DIR / '.env')
 
-# MongoDB connection
-mongo_url = os.environ['MONGO_URL']
-client = AsyncIOMotorClient(mongo_url)
-db = client[os.environ['DB_NAME']]
+# MongoDB connection — explicit env validation so missing vars fail with a
+# readable message instead of a KeyError at import time.
+MONGO_URL = os.environ.get('MONGO_URL')
+DB_NAME = os.environ.get('DB_NAME')
+if not MONGO_URL or not DB_NAME:
+    raise SystemExit(
+        "MONGO_URL and DB_NAME environment variables are required. "
+        "Copy backend/.env.example to backend/.env and fill them in."
+    )
+client = AsyncIOMotorClient(MONGO_URL)
+db = client[DB_NAME]
 
 # Stripe configuration
 stripe.api_key = os.environ.get('STRIPE_SECRET_KEY', '')
@@ -45,7 +55,7 @@ STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
 STRIPE_PRICE_ID = os.environ.get('STRIPE_PRICE_ID', 'price_PLACEHOLDER')
 STRIPE_PRICE_ID_PRO = os.environ.get('STRIPE_PRICE_ID_PRO', STRIPE_PRICE_ID)
 STRIPE_PRICE_ID_ENTERPRISE = os.environ.get('STRIPE_PRICE_ID_ENTERPRISE', '')
-APP_URL = os.environ.get('APP_URL', 'https://measure-build-3.preview.emergentagent.com')
+APP_URL = os.environ.get('APP_URL', 'http://localhost:3000')
 
 # Google Play configuration
 GOOGLE_PLAY_PACKAGE_NAME = os.environ.get('GOOGLE_PLAY_PACKAGE_NAME', 'com.poordudeholdings.estimatemobile')
@@ -56,6 +66,14 @@ GOOGLE_PLAY_PRODUCT_TIERS = {
     'pro_monthly': 'pro',
     'enterprise_monthly': 'enterprise',
 }
+
+# Origins allowed to call the API from a browser (comma-separated). The native
+# apps send no Origin header, so they are unaffected. Empty means no browser
+# origin is allowed; never default to "*".
+CORS_ORIGINS = [o.strip() for o in os.environ.get('CORS_ORIGINS', '').split(',') if o.strip()]
+
+# Header that carries the per-device secret issued by /customers/create.
+DEVICE_SECRET_HEADER = "X-Device-Secret"
 
 # Create the main app
 app = FastAPI(title="Construction Estimator API")
@@ -116,20 +134,65 @@ class SubscriptionStatusResponse(BaseModel):
     cancel_at_period_end: bool = False
 
 
+# ============== DEVICE AUTH ==============
+#
+# The app has no user accounts: each install makes a random user_id. That id
+# appears in logs and support screens, so it must not be enough on its own to
+# read or change a subscription. On first registration the server issues a
+# random device secret, stores only its SHA-256 hash, and every subscription
+# route requires the secret in the X-Device-Secret header.
+
+def _hash_secret(secret: str) -> str:
+    return hashlib.sha256(secret.encode("utf-8")).hexdigest()
+
+
+async def require_device(request: Request, user_id: str) -> dict:
+    """Return the customer record for user_id if the request proves ownership.
+
+    Raises 401 when the header is missing or wrong, or when the device has
+    never registered. The same error is used for every case so the response
+    does not reveal which user ids exist.
+    """
+    supplied = request.headers.get(DEVICE_SECRET_HEADER, "")
+    customer = await db.customers.find_one({"user_id": user_id}) if user_id else None
+    stored = (customer or {}).get("device_secret_hash", "")
+    if not supplied or not stored or not hmac.compare_digest(_hash_secret(supplied), stored):
+        raise HTTPException(status_code=401, detail="Device not authorized")
+    return customer
+
+
 # ============== CUSTOMER ENDPOINTS ==============
 
 @api_router.post("/customers/create")
-async def create_customer(request: CreateCustomerRequest):
+async def create_customer(request: CreateCustomerRequest, http_request: Request):
     """Create a Stripe customer for this device/user"""
     try:
         # Check if customer already exists
         existing = await db.customers.find_one({"user_id": request.user_id})
         if existing:
+            if existing.get("device_secret_hash"):
+                # Registered device: only its owner may read it back.
+                await require_device(http_request, request.user_id)
+                return {
+                    "customer_id": existing["id"],
+                    "stripe_customer_id": existing["stripe_customer_id"],
+                    "email": existing.get("email")
+                }
+            # Record created before device secrets existed: issue one now.
+            # The first device to call after the upgrade claims it.
+            device_secret = secrets.token_urlsafe(32)
+            await db.customers.update_one(
+                {"_id": existing["_id"]},
+                {"$set": {"device_secret_hash": _hash_secret(device_secret)}},
+            )
             return {
                 "customer_id": existing["id"],
                 "stripe_customer_id": existing["stripe_customer_id"],
-                "email": existing.get("email")
+                "email": existing.get("email"),
+                "device_secret": device_secret,
             }
+
+        device_secret = secrets.token_urlsafe(32)
         
         # Check if Stripe is configured
         if not stripe.api_key:
@@ -139,11 +202,14 @@ async def create_customer(request: CreateCustomerRequest):
                 stripe_customer_id=f"cus_mock_{request.user_id[:8]}",
                 email=request.email
             )
-            await db.customers.insert_one(mock_customer.dict())
+            await db.customers.insert_one(
+                {**mock_customer.dict(), "device_secret_hash": _hash_secret(device_secret)}
+            )
             return {
                 "customer_id": mock_customer.id,
                 "stripe_customer_id": mock_customer.stripe_customer_id,
                 "email": mock_customer.email,
+                "device_secret": device_secret,
                 "mock": True
             }
         
@@ -159,15 +225,20 @@ async def create_customer(request: CreateCustomerRequest):
             stripe_customer_id=stripe_customer.id,
             email=request.email
         )
-        await db.customers.insert_one(customer.dict())
+        await db.customers.insert_one(
+            {**customer.dict(), "device_secret_hash": _hash_secret(device_secret)}
+        )
         
         logger.info(f"Created customer for user {request.user_id}")
         
         return {
             "customer_id": customer.id,
             "stripe_customer_id": stripe_customer.id,
-            "email": customer.email
+            "email": customer.email,
+            "device_secret": device_secret,
         }
+    except HTTPException:
+        raise
     except stripe.error.StripeError as e:
         logger.error(f"Stripe error creating customer: {e}")
         raise HTTPException(status_code=400, detail=str(e))
@@ -212,8 +283,9 @@ def _verify_with_play_developer_api(product_id: str, purchase_token: str) -> Opt
 
 
 @api_router.post("/subscriptions/verify-google-play")
-async def verify_google_play_purchase(request: VerifyGooglePlayRequest):
+async def verify_google_play_purchase(request: VerifyGooglePlayRequest, http_request: Request):
     """Record (and optionally verify) a Google Play subscription purchase"""
+    await require_device(http_request, request.user_id)
     tier = GOOGLE_PLAY_PRODUCT_TIERS.get(request.product_id)
     if not tier:
         raise HTTPException(status_code=400, detail=f"Unknown product: {request.product_id}")
@@ -303,13 +375,10 @@ async def _get_google_play_status(user_id: str) -> Optional[SubscriptionStatusRe
 # ============== SUBSCRIPTION ENDPOINTS ==============
 
 @api_router.post("/subscriptions/create-checkout")
-async def create_subscription_checkout(request: CreateCheckoutRequest):
+async def create_subscription_checkout(request: CreateCheckoutRequest, http_request: Request):
     """Create a Stripe Checkout Session for subscription"""
     try:
-        # Get customer
-        customer = await db.customers.find_one({"user_id": request.user_id})
-        if not customer:
-            raise HTTPException(status_code=404, detail="Customer not found. Create customer first.")
+        customer = await require_device(http_request, request.user_id)
         
         # Check if Stripe is configured
         if not stripe.api_key:
@@ -335,8 +404,9 @@ async def create_subscription_checkout(request: CreateCheckoutRequest):
                 "price": price_id,
                 "quantity": 1,
             }],
-            success_url=f"{APP_URL}/?success=true&user_id={request.user_id}",
-            cancel_url=f"{APP_URL}/?canceled=true&user_id={request.user_id}",
+            # Keep the user id out of redirect URLs (browser history, logs).
+            success_url=f"{APP_URL}/?success=true",
+            cancel_url=f"{APP_URL}/?canceled=true",
             metadata={"user_id": request.user_id, "plan": request.plan},
         )
         
@@ -358,8 +428,9 @@ async def create_subscription_checkout(request: CreateCheckoutRequest):
 
 
 @api_router.get("/subscriptions/status/{user_id}", response_model=SubscriptionStatusResponse)
-async def get_subscription_status(user_id: str):
+async def get_subscription_status(user_id: str, http_request: Request):
     """Get current subscription status for a user"""
+    await require_device(http_request, user_id)
     try:
         # Google Play subscription takes priority
         google_play_status = await _get_google_play_status(user_id)
@@ -420,14 +491,17 @@ async def get_subscription_status(user_id: str):
             current_period_end=subscription.get("current_period_end"),
             cancel_at_period_end=subscription.get("cancel_at_period_end", False)
         )
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error getting subscription status: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
 @api_router.post("/subscriptions/cancel/{user_id}")
-async def cancel_subscription(user_id: str):
+async def cancel_subscription(user_id: str, http_request: Request):
     """Cancel a user's subscription at period end"""
+    await require_device(http_request, user_id)
     try:
         subscription = await db.subscriptions.find_one({"user_id": user_id})
         if not subscription:
@@ -503,7 +577,37 @@ async def handle_stripe_webhook(request: Request):
     logger.info(f"Received webhook: {event_type}")
     
     # Handle subscription events
-    if event_type in ["customer.subscription.created", "customer.subscription.updated"]:
+    if event_type == "checkout.session.completed":
+        # Without this, a Stripe purchase was never written to the database
+        # (the other handlers only update existing rows), so web buyers paid
+        # and stayed on the free tier.
+        user_id = (event_data.get("metadata") or {}).get("user_id")
+        sub_id = event_data.get("subscription")
+        if event_data.get("mode") == "subscription" and user_id and sub_id:
+            plan = (event_data.get("metadata") or {}).get("plan", "pro")
+            price_id = STRIPE_PRICE_ID_ENTERPRISE if plan == "enterprise" else STRIPE_PRICE_ID_PRO
+            fields = {
+                "user_id": user_id,
+                "stripe_subscription_id": sub_id,
+                "stripe_customer_id": event_data.get("customer"),
+                "price_id": price_id,
+                "status": "active",
+                "updated_at": datetime.utcnow(),
+            }
+            try:
+                stripe_sub = stripe.Subscription.retrieve(sub_id)
+                fields["status"] = getattr(stripe_sub, "status", "active")
+                fields["current_period_end"] = getattr(stripe_sub, "current_period_end", None)
+                fields["cancel_at_period_end"] = getattr(stripe_sub, "cancel_at_period_end", False)
+            except stripe.error.StripeError as e:
+                logger.warning(f"Could not fetch subscription {sub_id}: {e}")
+            await db.subscriptions.update_one(
+                {"user_id": user_id},
+                {"$set": fields, "$setOnInsert": {"id": str(uuid.uuid4()), "created_at": datetime.utcnow()}},
+                upsert=True,
+            )
+
+    elif event_type in ["customer.subscription.created", "customer.subscription.updated"]:
         await db.subscriptions.update_one(
             {"stripe_subscription_id": event_data["id"]},
             {"$set": {
@@ -570,10 +674,10 @@ app.include_router(api_router)
 # CORS middleware
 app.add_middleware(
     CORSMiddleware,
-    allow_credentials=True,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_credentials=False,
+    allow_origins=CORS_ORIGINS,
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type", DEVICE_SECRET_HEADER],
 )
 
 @app.on_event("shutdown")

@@ -35,10 +35,10 @@ export default function CustomerDetailScreen() {
     const c = await getCustomerById(id as string);
     if (c) {
       setName(c.name);
-      setEmail(c.email);
-      setPhone(c.phone);
-      setAddress(c.address);
-      setNotes(c.notes);
+      setEmail(c.email ?? '');
+      setPhone(c.phone ?? '');
+      setAddress(c.address ?? '');
+      setNotes(c.notes ?? '');
     }
     setIsLoadingData(false);
   };
