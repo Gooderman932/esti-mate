@@ -12,10 +12,18 @@ jobs:
   preview:
     name: EAS preview build (Android APK)
     runs-on: ubuntu-latest
-    if: ${{ secrets.EXPO_TOKEN != '' }}
+    # `secrets` is not available in job-level `if`, so the token check runs as a step.
+    env:
+      EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - name: Require EXPO_TOKEN
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::error::Add an EXPO_TOKEN repository secret (expo.dev > Account settings > Access tokens)."
+            exit 1
+          fi
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with:
           node-version: '20'
           cache: 'npm'

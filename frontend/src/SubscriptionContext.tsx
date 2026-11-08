@@ -10,6 +10,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import * as RNIap from 'react-native-iap';
+import { deviceHeaders, saveDeviceSecret } from './api/deviceAuth';
 import {
   getSettings,
   saveSettings,
@@ -25,8 +26,14 @@ import {
   TIER_FOR_PRODUCT_ID,
   TIER_LIMITS,
 } from './types';
+import { resolveApiUrl } from './config/api';
 
-const API_URL = Constants.expoConfig?.extra?.apiUrl || process.env.EXPO_PUBLIC_BACKEND_URL || '';
+// Backend base URL. Empty string means "no backend": production/preview
+// builds are Play-Billing-only (see src/config/api.ts). Never invent a URL.
+const API_URL = resolveApiUrl(
+  Constants.expoConfig?.extra?.apiUrl,
+  process.env.EXPO_PUBLIC_API_BASE_URL,
+);
 
 interface MonthlyUsage {
   used: number;
@@ -138,6 +145,11 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     const purchaseToken: string = purchase?.purchaseToken || '';
     if (!purchaseToken || !TIER_FOR_PRODUCT_ID[productId]) return;
 
+    // Pending purchases (e.g. cash/slow payment methods) are not paid yet.
+    // Google requires that we neither grant access nor acknowledge them until
+    // they transition to 'purchased'; the listener fires again when they do.
+    if (purchase?.purchaseState === 'pending') return;
+
     const uid = userIdRef.current;
     const purchasedTier = TIER_FOR_PRODUCT_ID[productId];
 
@@ -147,7 +159,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       try {
         await fetch(`${API_URL}/api/subscriptions/verify-google-play`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: await deviceHeaders(),
           body: JSON.stringify({
             user_id: uid,
             product_id: productId,
@@ -157,6 +169,12 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       } catch (e) {
         console.warn('Backend verification failed, granting locally:', e);
       }
+    } else if (uid && !API_URL) {
+      // Play-Billing-only build: no backend to notify. The Play purchase
+      // itself is the entitlement; see src/config/api.ts.
+      console.warn(
+        '[Esti-Mate] No backend API URL configured — purchase recorded locally only (Play-Billing-only build).',
+      );
     }
 
     // Acknowledge the purchase — Google refunds unacknowledged purchases after 3 days
@@ -180,7 +198,10 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     try {
       const purchases: any[] = await RNIap.getAvailablePurchases();
       const active = purchases.find(
-        (p) => TIER_FOR_PRODUCT_ID[p.productId] && p.purchaseToken
+        (p) =>
+          TIER_FOR_PRODUCT_ID[p.productId] &&
+          p.purchaseToken &&
+          p.purchaseState !== 'pending'
       );
       if (active) {
         // Acknowledge if Play returned it un-acknowledged (e.g. app killed mid-purchase)
@@ -198,6 +219,20 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
         });
         return true;
       }
+
+      // Play returned successfully with no active subscription. If the cached
+      // entitlement came from Google Play, it has expired or been canceled /
+      // refunded, so drop back to the free tier instead of keeping Pro forever.
+      const cached = await getSubscriptionStatus();
+      if (cached?.billingSource === 'google_play' && cached.isPro) {
+        await applyStatus({
+          userId: uid,
+          isPro: false,
+          tier: 'free',
+          billingSource: 'google_play',
+          status: 'canceled',
+        });
+      }
     } catch (e) {
       console.warn('Could not sync Play purchases:', e);
     }
@@ -208,29 +243,44 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     // A locally-synced Play subscription wins; the server check below only
     // upgrades the status, never downgrades a live Play entitlement.
     try {
-      if (!API_URL) throw new Error('no API url configured');
+      if (!API_URL) {
+        // Play-Billing-only build: there is no backend to check against, so
+        // say so loudly and fall through to the cached status below instead
+        // of throwing a bare "no API url configured" that gets swallowed.
+        // On Android the Play entitlement synced above is the source of truth.
+        console.warn(
+          '[Esti-Mate] No backend API URL configured — skipping server subscription check (Play-Billing-only build; see src/config/api.ts).',
+        );
+      } else {
+        const registration = await fetch(`${API_URL}/api/customers/create`, {
+          method: 'POST',
+          headers: await deviceHeaders(),
+          body: JSON.stringify({ user_id: uid }),
+        });
+        if (registration.ok) {
+          // The server returns a device secret only when it issues a new one.
+          const reg = await registration.json();
+          if (reg?.device_secret) await saveDeviceSecret(reg.device_secret);
+        }
 
-      await fetch(`${API_URL}/api/customers/create`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: uid }),
-      });
-
-      const response = await fetch(`${API_URL}/api/subscriptions/status/${uid}`);
-      if (response.ok) {
-        const data = await response.json();
-        if (data.is_pro) {
-          await applyStatus({
-            userId: uid,
-            isPro: data.is_pro,
-            tier: (data.tier as SubscriptionTier) || (data.is_pro ? 'pro' : 'free'),
-            billingSource: data.billing_source,
-            subscriptionId: data.subscription_id,
-            status: data.status,
-            currentPeriodEnd: data.current_period_end,
-            cancelAtPeriodEnd: data.cancel_at_period_end,
-          });
-          return;
+        const response = await fetch(`${API_URL}/api/subscriptions/status/${uid}`, {
+          headers: await deviceHeaders(false),
+        });
+        if (response.ok) {
+          const data = await response.json();
+          if (data.is_pro) {
+            await applyStatus({
+              userId: uid,
+              isPro: data.is_pro,
+              tier: (data.tier as SubscriptionTier) || (data.is_pro ? 'pro' : 'free'),
+              billingSource: data.billing_source,
+              subscriptionId: data.subscription_id,
+              status: data.status,
+              currentPeriodEnd: data.current_period_end,
+              cancelAtPeriodEnd: data.cancel_at_period_end,
+            });
+            return;
+          }
         }
       }
     } catch (error) {
