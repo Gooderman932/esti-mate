@@ -1,5 +1,21 @@
 # Construction Estimator App - PRD
 
+> **Corrections — 2026-11-08 launch-ready pass (docs only; no code prices changed).**
+> The code is the source of truth where this PRD disagreed with it:
+> - Pro is **$29.99/month** in code (`frontend/src/types/index.ts` `TIER_PRICES`),
+>   not $9.99. The $9.99 below was stale.
+> - Free tier is **3 estimates/invoices per month, enforced** (routes to the
+>   paywall via `canCreateEstimate()`), not a 5-active-estimate limit. The
+>   "5" figures below were stale; the P1 "enforce the limit" item is done.
+> - Billing on Android is **Google Play Billing** (Play Store price is the
+>   live price); Stripe web checkout is the non-Android fallback only.
+> - **No `.env` with live Stripe keys exists in this repo** (and none may be
+>   committed). The "Live keys in /app/backend/.env" line below referred to
+>   an old Emergent-hosted environment, not this repository.
+> - Production builds ship with an empty API URL on purpose
+>   (Play-Billing-only path) — see `frontend/src/config/api.ts` and
+>   `docs/API_URL.md`. Do not invent a production URL.
+
 ## Original Problem Statement
 Build a React Native/Expo mobile app for construction/job estimating with:
 1. Camera capture and document scanning
@@ -25,7 +41,7 @@ Build a React Native/Expo mobile app for construction/job estimating with:
 ## Core Features Implemented
 
 ### MVP (Complete)
-- ✅ Home screen with estimate list and Free tier badge (0/5 active)
+- ✅ Home screen with estimate list and Free tier badge (0/3 this month)
 - ✅ Create estimate/invoice with auto-incrementing numbers (EST-0001, INV-0001)
 - ✅ Estimate detail screen with customer info, document image, line items, totals
 - ✅ Camera/gallery image picker with corner selection (perspective correction)
@@ -37,8 +53,8 @@ Build a React Native/Expo mobile app for construction/job estimating with:
 - ✅ Materials catalog
 
 ### Stripe Pro Subscription (Complete)
-- ✅ Free tier: 5 active estimates limit
-- ✅ Pro tier: $9.99/month via Stripe web checkout
+- ✅ Free tier: 3 estimates/invoices per month limit (enforced — routes to paywall)
+- ✅ Pro tier: $29.99/month (code price in `TIER_PRICES`; Play Store price is the live price on Android) via Google Play Billing on Android, Stripe web checkout as the non-Android fallback
 - ✅ Paywall screen with feature comparison
 - ✅ Backend: FastAPI with Stripe customer creation, checkout session, webhooks
 - ✅ SubscriptionContext for feature gating
@@ -69,14 +85,14 @@ Build a React Native/Expo mobile app for construction/job estimating with:
 ## Environment
 - Frontend URL: https://measure-build-3.preview.emergentagent.com
 - Backend: 0.0.0.0:8001 (proxied via nginx at /api/*)
-- Stripe: Live keys in /app/backend/.env
+- Stripe: keys are NOT in this repo (no `backend/.env` is present); keys live only in the deployment environment and must never be committed
 
 ## Prioritized Backlog
 
 ### P1 - Next Up
 - Add Measurement History and Settings links in app Settings screen
 - PDF Export Enhancement: include company logo for Pro users
-- Enforce Free Tier 5-estimate limit when creating new estimates
+- ~~Enforce Free Tier 5-estimate limit when creating new estimates~~ — DONE: the 3/month free limit is enforced via `canCreateEstimate()` → paywall (verified 2026-11-08)
 
 ### P2 - Future
 - QuickMeasure component on estimate detail screen (recent measurements)

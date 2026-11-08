@@ -22,9 +22,16 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { useSubscription } from '../src/SubscriptionContext';
+import { deviceHeaders } from '../src/api/deviceAuth';
 import { TIER_LIMITS, TIER_PRICES } from '../src/types';
+import { resolveApiUrl, NO_API_URL_MESSAGE } from '../src/config/api';
 
-const API_URL = Constants.expoConfig?.extra?.apiUrl || process.env.EXPO_PUBLIC_API_BASE_URL || '';
+// Backend base URL. Empty string means "no backend": production/preview
+// builds are Play-Billing-only (see src/config/api.ts). Never invent a URL.
+const API_URL = resolveApiUrl(
+  Constants.expoConfig?.extra?.apiUrl,
+  process.env.EXPO_PUBLIC_API_BASE_URL,
+);
 const SUPPORT_EMAIL = 'admin@poordudeholdings.com';
 
 type Plan = 'pro' | 'enterprise';
@@ -90,12 +97,17 @@ export default function PaywallScreen() {
       return;
     }
 
-    // Non-Android: Stripe browser checkout
+    // Non-Android: Stripe browser checkout. This NEEDS the backend — fail
+    // loudly with a clear config error instead of fetching against "".
+    if (!API_URL) {
+      Alert.alert('Checkout unavailable', NO_API_URL_MESSAGE);
+      return;
+    }
     try {
       setLoading(true);
       const response = await fetch(`${API_URL}/api/subscriptions/create-checkout`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await deviceHeaders(),
         body: JSON.stringify({ user_id: userId, plan: selectedPlan }),
       });
       const data = await response.json();
