@@ -25,8 +25,14 @@ import {
   TIER_FOR_PRODUCT_ID,
   TIER_LIMITS,
 } from './types';
+import { resolveApiUrl } from './config/api';
 
-const API_URL = Constants.expoConfig?.extra?.apiUrl || process.env.EXPO_PUBLIC_API_BASE_URL || '';
+// Backend base URL. Empty string means "no backend": production/preview
+// builds are Play-Billing-only (see src/config/api.ts). Never invent a URL.
+const API_URL = resolveApiUrl(
+  Constants.expoConfig?.extra?.apiUrl,
+  process.env.EXPO_PUBLIC_API_BASE_URL,
+);
 
 interface MonthlyUsage {
   used: number;
@@ -162,6 +168,12 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       } catch (e) {
         console.warn('Backend verification failed, granting locally:', e);
       }
+    } else if (uid && !API_URL) {
+      // Play-Billing-only build: no backend to notify. The Play purchase
+      // itself is the entitlement; see src/config/api.ts.
+      console.warn(
+        '[Esti-Mate] No backend API URL configured — purchase recorded locally only (Play-Billing-only build).',
+      );
     }
 
     // Acknowledge the purchase — Google refunds unacknowledged purchases after 3 days
@@ -230,29 +242,37 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
     // A locally-synced Play subscription wins; the server check below only
     // upgrades the status, never downgrades a live Play entitlement.
     try {
-      if (!API_URL) throw new Error('no API url configured');
+      if (!API_URL) {
+        // Play-Billing-only build: there is no backend to check against, so
+        // say so loudly and fall through to the cached status below instead
+        // of throwing a bare "no API url configured" that gets swallowed.
+        // On Android the Play entitlement synced above is the source of truth.
+        console.warn(
+          '[Esti-Mate] No backend API URL configured — skipping server subscription check (Play-Billing-only build; see src/config/api.ts).',
+        );
+      } else {
+        await fetch(`${API_URL}/api/customers/create`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ user_id: uid }),
+        });
 
-      await fetch(`${API_URL}/api/customers/create`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: uid }),
-      });
-
-      const response = await fetch(`${API_URL}/api/subscriptions/status/${uid}`);
-      if (response.ok) {
-        const data = await response.json();
-        if (data.is_pro) {
-          await applyStatus({
-            userId: uid,
-            isPro: data.is_pro,
-            tier: (data.tier as SubscriptionTier) || (data.is_pro ? 'pro' : 'free'),
-            billingSource: data.billing_source,
-            subscriptionId: data.subscription_id,
-            status: data.status,
-            currentPeriodEnd: data.current_period_end,
-            cancelAtPeriodEnd: data.cancel_at_period_end,
-          });
-          return;
+        const response = await fetch(`${API_URL}/api/subscriptions/status/${uid}`);
+        if (response.ok) {
+          const data = await response.json();
+          if (data.is_pro) {
+            await applyStatus({
+              userId: uid,
+              isPro: data.is_pro,
+              tier: (data.tier as SubscriptionTier) || (data.is_pro ? 'pro' : 'free'),
+              billingSource: data.billing_source,
+              subscriptionId: data.subscription_id,
+              status: data.status,
+              currentPeriodEnd: data.current_period_end,
+              cancelAtPeriodEnd: data.cancel_at_period_end,
+            });
+            return;
+          }
         }
       }
     } catch (error) {
