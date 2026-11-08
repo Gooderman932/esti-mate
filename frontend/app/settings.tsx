@@ -26,8 +26,14 @@ import { useSubscription } from '../src/SubscriptionContext';
 import { deviceHeaders } from '../src/api/deviceAuth';
 import { AppSettings } from '../src/types';
 import Constants from 'expo-constants';
+import { resolveApiUrl, NO_API_URL_MESSAGE } from '../src/config/api';
 
-const API_URL = Constants.expoConfig?.extra?.apiUrl || process.env.EXPO_PUBLIC_API_BASE_URL || '';
+// Backend base URL. Empty string means "no backend": production/preview
+// builds are Play-Billing-only (see src/config/api.ts). Never invent a URL.
+const API_URL = resolveApiUrl(
+  Constants.expoConfig?.extra?.apiUrl,
+  process.env.EXPO_PUBLIC_API_BASE_URL,
+);
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -128,6 +134,12 @@ export default function SettingsScreen() {
           text: 'Cancel',
           style: 'destructive',
           onPress: async () => {
+            // Stripe cancel NEEDS the backend — fail loudly with a clear
+            // config error instead of fetching against "".
+            if (!API_URL) {
+              Alert.alert('Cancel unavailable', NO_API_URL_MESSAGE);
+              return;
+            }
             try {
               const response = await fetch(`${API_URL}/api/subscriptions/cancel/${userId}`, {
                 method: 'POST',
