@@ -23,6 +23,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useSubscription } from '../src/SubscriptionContext';
+import { deviceHeaders } from '../src/api/deviceAuth';
 import { AppSettings } from '../src/types';
 import Constants from 'expo-constants';
 
@@ -130,6 +131,7 @@ export default function SettingsScreen() {
             try {
               const response = await fetch(`${API_URL}/api/subscriptions/cancel/${userId}`, {
                 method: 'POST',
+                headers: await deviceHeaders(false),
               });
               if (response.ok) {
                 await checkSubscription();

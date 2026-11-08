@@ -22,6 +22,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { useSubscription } from '../src/SubscriptionContext';
+import { deviceHeaders } from '../src/api/deviceAuth';
 import { TIER_LIMITS, TIER_PRICES } from '../src/types';
 
 const API_URL = Constants.expoConfig?.extra?.apiUrl || process.env.EXPO_PUBLIC_API_BASE_URL || '';
@@ -95,7 +96,7 @@ export default function PaywallScreen() {
       setLoading(true);
       const response = await fetch(`${API_URL}/api/subscriptions/create-checkout`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: await deviceHeaders(),
         body: JSON.stringify({ user_id: userId, plan: selectedPlan }),
       });
       const data = await response.json();
