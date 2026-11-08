@@ -193,9 +193,3 @@ export const emptyBusiness: BusinessInfo = {
   phone: '',
   address: '',
 };
-
-// Free tier limits (legacy alias, prefer TIER_LIMITS)
-export const FREE_TIER_LIMITS = {
-  maxActiveEstimates: 3,
-  canUploadLogo: false,
-};
