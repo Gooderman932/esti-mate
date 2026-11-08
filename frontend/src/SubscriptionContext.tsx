@@ -10,6 +10,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import * as RNIap from 'react-native-iap';
+import { deviceHeaders, saveDeviceSecret } from './api/deviceAuth';
 import {
   getSettings,
   saveSettings,
@@ -158,7 +159,7 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
       try {
         await fetch(`${API_URL}/api/subscriptions/verify-google-play`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: await deviceHeaders(),
           body: JSON.stringify({
             user_id: uid,
             product_id: productId,
@@ -251,13 +252,20 @@ export function SubscriptionProvider({ children }: { children: React.ReactNode }
           '[Esti-Mate] No backend API URL configured — skipping server subscription check (Play-Billing-only build; see src/config/api.ts).',
         );
       } else {
-        await fetch(`${API_URL}/api/customers/create`, {
+        const registration = await fetch(`${API_URL}/api/customers/create`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: await deviceHeaders(),
           body: JSON.stringify({ user_id: uid }),
         });
+        if (registration.ok) {
+          // The server returns a device secret only when it issues a new one.
+          const reg = await registration.json();
+          if (reg?.device_secret) await saveDeviceSecret(reg.device_secret);
+        }
 
-        const response = await fetch(`${API_URL}/api/subscriptions/status/${uid}`);
+        const response = await fetch(`${API_URL}/api/subscriptions/status/${uid}`, {
+          headers: await deviceHeaders(false),
+        });
         if (response.ok) {
           const data = await response.json();
           if (data.is_pro) {

@@ -203,6 +203,17 @@ def test_webhook_marks_deleted_subscription_canceled(client, fake_db):
 # ------------------------------------------- customers / subscriptions -----
 
 
+def register(client, user_id="device-abc"):
+    """Register a device and return the headers that prove it owns user_id.
+
+    Subscription routes require the device secret issued at registration
+    (see test_device_auth.py for the access-control tests themselves).
+    """
+    response = client.post("/api/customers/create", json={"user_id": user_id})
+    assert response.status_code == 200, response.text
+    return {"X-Device-Secret": response.json()["device_secret"]}
+
+
 def test_create_customer_mock_when_stripe_unconfigured(client, fake_db):
     response = client.post(
         "/api/customers/create", json={"user_id": "device-abc", "email": None}
@@ -216,16 +227,21 @@ def test_create_customer_mock_when_stripe_unconfigured(client, fake_db):
 
 def test_create_customer_is_idempotent(client, fake_db):
     first = client.post("/api/customers/create", json={"user_id": "device-abc"}).json()
-    second = client.post("/api/customers/create", json={"user_id": "device-abc"}).json()
+    second = client.post(
+        "/api/customers/create",
+        json={"user_id": "device-abc"},
+        headers={"X-Device-Secret": first["device_secret"]},
+    ).json()
     assert first["customer_id"] == second["customer_id"]
     assert len(fake_db.customers.docs) == 1
 
 
-def test_subscription_status_unknown_user_is_free(client):
-    response = client.get("/api/subscriptions/status/unknown-device")
+def test_subscription_status_new_device_is_free(client):
+    headers = register(client, "new-device")
+    response = client.get("/api/subscriptions/status/new-device", headers=headers)
     assert response.status_code == 200
     body = response.json()
-    assert body["user_id"] == "unknown-device"
+    assert body["user_id"] == "new-device"
     assert body["is_pro"] is False
     assert body["tier"] == "free"
     assert body["status"] == "none"
@@ -244,7 +260,8 @@ def test_subscription_status_returns_cached_mock_active(client, fake_db):
             "cancel_at_period_end": False,
         }
     )
-    body = client.get("/api/subscriptions/status/device-abc").json()
+    headers = register(client)
+    body = client.get("/api/subscriptions/status/device-abc", headers=headers).json()
     assert body["is_pro"] is True
     assert body["tier"] == "pro"
     assert body["billing_source"] == "stripe"
@@ -252,10 +269,11 @@ def test_subscription_status_returns_cached_mock_active(client, fake_db):
 
 
 def test_create_checkout_mock_when_stripe_unconfigured(client):
-    client.post("/api/customers/create", json={"user_id": "device-abc"})
+    headers = register(client)
     response = client.post(
         "/api/subscriptions/create-checkout",
         json={"user_id": "device-abc", "plan": "pro"},
+        headers=headers,
     )
     assert response.status_code == 200
     body = response.json()
@@ -263,16 +281,18 @@ def test_create_checkout_mock_when_stripe_unconfigured(client):
     assert body["checkout_url"] is None
 
 
-def test_create_checkout_unknown_customer_404(client):
+def test_create_checkout_unregistered_device_401(client):
+    # Unregistered and unauthorized look the same, so ids can't be probed.
     response = client.post(
         "/api/subscriptions/create-checkout",
         json={"user_id": "nobody", "plan": "pro"},
     )
-    assert response.status_code == 404
+    assert response.status_code == 401
 
 
 def test_cancel_unknown_subscription_404(client):
-    response = client.post("/api/subscriptions/cancel/nobody")
+    headers = register(client, "nobody")
+    response = client.post("/api/subscriptions/cancel/nobody", headers=headers)
     assert response.status_code == 404
 
 
@@ -287,7 +307,8 @@ def test_cancel_mock_subscription_schedules_cancel(client, fake_db):
             "status": "active",
         }
     )
-    response = client.post("/api/subscriptions/cancel/device-abc")
+    headers = register(client)
+    response = client.post("/api/subscriptions/cancel/device-abc", headers=headers)
     assert response.status_code == 200
     assert response.json()["status"] == "cancel_scheduled"
     assert response.json()["mock"] is True
@@ -305,6 +326,7 @@ def test_verify_google_play_unknown_product_400(client):
             "product_id": "not_a_product",
             "purchase_token": "token-123",
         },
+        headers=register(client),
     )
     assert response.status_code == 400
     assert "Unknown product" in response.json()["detail"]
@@ -322,6 +344,7 @@ def test_verify_google_play_known_product_records_unverified(client, fake_db):
             "product_id": "pro_monthly",
             "purchase_token": "token-123",
         },
+        headers=register(client),
     )
     assert response.status_code == 200
     body = response.json()
@@ -333,6 +356,7 @@ def test_verify_google_play_known_product_records_unverified(client, fake_db):
 
 
 def test_verify_google_play_then_status_is_pro(client):
+    headers = register(client)
     client.post(
         "/api/subscriptions/verify-google-play",
         json={
@@ -340,8 +364,9 @@ def test_verify_google_play_then_status_is_pro(client):
             "product_id": "pro_monthly",
             "purchase_token": "token-123",
         },
+        headers=headers,
     )
-    body = client.get("/api/subscriptions/status/device-abc").json()
+    body = client.get("/api/subscriptions/status/device-abc", headers=headers).json()
     assert body["is_pro"] is True
     assert body["tier"] == "pro"
     assert body["billing_source"] == "google_play"
@@ -365,7 +390,8 @@ def test_expired_google_play_record_without_service_account_drops_to_free(
             "auto_renewing": True,
         }
     )
-    body = client.get("/api/subscriptions/status/device-abc").json()
+    headers = register(client)
+    body = client.get("/api/subscriptions/status/device-abc", headers=headers).json()
     assert body["is_pro"] is False
     assert body["tier"] == "free"
     assert fake_db.google_play_subscriptions.docs[0]["status"] == "canceled"
