@@ -2,7 +2,7 @@
   "expo": {
     "name": "Esti-Mate Pro",
     "slug": "esti-mate",
-    "version": "1.1.7",
+    "version": "1.1.8",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "estimateapp",
@@ -12,7 +12,7 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.poordudeholdings.estimatemobile",
-      "buildNumber": "103",
+      "buildNumber": "104",
       "infoPlist": {
         "NSCameraUsageDescription": "Take photos of job sites for measurements and estimates",
         "NSPhotoLibraryUsageDescription": "Select photos for estimates and invoices"
@@ -20,7 +20,7 @@
     },
     "android": {
       "package": "com.poordudeholdings.estimatemobile",
-      "versionCode": 103,
+      "versionCode": 104,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#007AFF"
@@ -31,6 +31,10 @@
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
         "com.android.vending.BILLING"
+      ],
+      "blockedPermissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.SYSTEM_ALERT_WINDOW"
       ]
     },
     "web": {
@@ -49,7 +53,24 @@
           "backgroundColor": "#000000"
         }
       ],
-      "./plugins/withRNIAP"
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Take photos of job sites for measurements and estimates",
+          "recordAudioAndroid": false
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Select photos for estimates and invoices",
+          "cameraPermission": "Take photos of job sites for measurements and estimates",
+          "microphonePermission": false
+        }
+      ],
+      "./plugins/withRNIAP",
+      "expo-font",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true
