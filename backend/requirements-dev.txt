@@ -792,9 +792,9 @@ starlette==1.10.0 \
     #   -c requirements.txt
     #   -r requirements.in
     #   fastapi
-stripe==15.6.2 \
-    --hash=sha256:7908986619d42cd18bd340a74514f5b26a82e39d3548eefb24941b0ea85154a3 \
-    --hash=sha256:d4bfb06e61f755e55dcc3a3c4dcd268a84f479faf895570e98733ec0552f6fba
+stripe==16.1.0 \
+    --hash=sha256:21e72b6779b8cff337ca8d2b8d30138f2d68f6a8d739701076f06a418ad75b8c \
+    --hash=sha256:3798e07a0603c8923710414cd1942ae847ed43cebbf34c3258417c189711ea70
     # via
     #   -c requirements.txt
     #   -r requirements.in
@@ -803,12 +803,10 @@ typing-extensions==4.16.0 \
     --hash=sha256:dc983d19a509c94dba722ee6abd33940f7c05a89e243c47e907eb4db6f1a43e5
     # via
     #   -c requirements.txt
-    #   anyio
     #   fastapi
     #   opentelemetry-api
     #   pydantic
     #   pydantic-core
-    #   starlette
     #   stripe
     #   typing-inspection
 typing-inspection==0.4.5 \

@@ -22,5 +22,5 @@ pydantic>=2.13,<3
 python-dotenv>=1.2,<2
 starlette
 # Stripe SDK majors change the pinned Stripe API version; upgrade deliberately.
-stripe>=15.2,<16
+stripe>=16.1.0,<17
 uvicorn>=0.49,<1
