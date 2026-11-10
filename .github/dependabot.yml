@@ -5,6 +5,13 @@ updates:
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 10
+    ignore:
+      # Each Stripe SDK major pins a newer Stripe API version, which can change
+      # the fields checkout and the webhook handler read. Upgrade it on purpose
+      # (requirements.in), tested in Stripe test mode. Scoped to version
+      # updates, so security advisories still open PRs.
+      - dependency-name: "stripe"
+        update-types: ["version-update:semver-major"]
     groups:
       fastapi:
         patterns:
