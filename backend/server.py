@@ -572,7 +572,11 @@ async def handle_stripe_webhook(request: Request):
         raise HTTPException(status_code=400, detail="Invalid signature")
     
     event_type = event["type"]
-    event_data = event["data"]["object"]
+    # stripe-python 15 objects are no longer dict subclasses: .get() raises
+    # AttributeError, which made every handled event below return 500 (so a
+    # completed checkout was never recorded). Work on a plain dict instead.
+    event_object = event["data"]["object"]
+    event_data = event_object.to_dict() if hasattr(event_object, "to_dict") else dict(event_object)
     
     logger.info(f"Received webhook: {event_type}")
     

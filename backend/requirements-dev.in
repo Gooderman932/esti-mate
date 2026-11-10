@@ -1,0 +1,8 @@
+# CI / local development: the runtime set plus test tools.
+# Constrained to requirements.txt so shared packages match production exactly.
+-c requirements.txt
+-r requirements.in
+
+httpx
+mongomock-motor<0.0.30
+pytest

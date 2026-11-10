@@ -1,0 +1,26 @@
+# Runtime dependencies imported by server.py.
+#
+# requirements.txt (runtime) and requirements-dev.txt (CI) are pinned,
+# hash-checked lockfiles compiled from the .in files. Do not edit them by
+# hand: change an .in file, then regenerate both for Python 3.12 (the
+# version CI tests):
+#
+#   uv pip compile --python-version 3.12 --generate-hashes requirements.in -o requirements.txt
+#   uv pip compile --python-version 3.12 --generate-hashes requirements-dev.in -o requirements-dev.txt
+#
+# Dependabot updates the .in and .txt files together, so pins can no longer
+# drift into impossible combinations (main had boto3 1.42.42 pinned next to
+# s3transfer 0.19.0, which boto3 1.42 does not accept).
+
+fastapi>=0.138,<1
+google-api-python-client>=2.189,<3
+google-auth>=2.49,<3
+# Motor is deprecated in favour of PyMongo's native async API
+# (pymongo.AsyncMongoClient); plan that migration before Motor 4.
+motor>=3.7,<4
+pydantic>=2.13,<3
+python-dotenv>=1.2,<2
+starlette
+# Stripe SDK majors change the pinned Stripe API version; upgrade deliberately.
+stripe>=15.2,<16
+uvicorn>=0.49,<1
