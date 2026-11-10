@@ -20,12 +20,13 @@ jobs:
         with:
           python-version: '3.12'
           cache: 'pip'
-          cache-dependency-path: backend/requirements.txt
-      - name: Install
+          cache-dependency-path: backend/requirements-dev.txt
+      - name: Install (hash-checked lockfile)
         working-directory: backend
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+          pip check
       - name: Import smoke
         working-directory: backend
         env:
@@ -34,11 +35,7 @@ jobs:
           STRIPE_SECRET_KEY: sk_test_placeholder
           STRIPE_WEBHOOK_SECRET: whsec_placeholder
         run: python -c "import server; print('OK')"
-      - name: Pytest (if any)
+      - name: Pytest
         working-directory: backend
-        run: |
-          if compgen -G "test_*.py" > /dev/null || compgen -G "tests/*.py" > /dev/null; then
-            pip install pytest 'mongomock-motor<0.0.30' httpx && pytest -q
-          else
-            echo "no tests"
-          fi
+        # Test tools come from requirements-dev.txt; an empty suite fails CI.
+        run: pytest -q
