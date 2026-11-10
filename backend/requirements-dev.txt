@@ -459,9 +459,9 @@ mongomock==4.3.0 \
     --hash=sha256:32667b79066fabc12d4f17f16a8fd7361b5f4435208b3ba32c226e52212a8c30 \
     --hash=sha256:5ef86bd12fc8806c6e7af32f21266c61b6c4ba96096f85129852d1c4fec1327e
     # via mongomock-motor
-mongomock-motor==0.0.29 \
-    --hash=sha256:600c2f6f7c6857691b3a75fb74b22b881ab69cc992bb00296bfe5811e3470bae \
-    --hash=sha256:a16c5746fad48ba5bce37aecd27729343e58e66f91652a94c0659d7f9dac4302
+mongomock-motor==0.0.36 \
+    --hash=sha256:3cf62352ece5af2f02e04d2f252393f88b5fe0487997da00584020cee4b8efba \
+    --hash=sha256:3ecb7949662b8986ff9c267fa0b1402b5b75a6afd57f03850cd6e13a067e3691
     # via -r requirements-dev.in
 motor==3.7.1 \
     --hash=sha256:27b4d46625c87928f331a6ca9d7c51c2f518ba0e270939d395bc1ddc89d64526 \
@@ -469,6 +469,7 @@ motor==3.7.1 \
     # via
     #   -c requirements.txt
     #   -r requirements.in
+    #   mongomock-motor
 opentelemetry-api==1.45.2 \
     --hash=sha256:2cbd737377e710ee740d261c94e93fa0f08e6d037c18f17513cc0a2d94479a34 \
     --hash=sha256:d7b0008e21e5fd61cbe7a7f34ca3b6905a78ab677d9bc395e299359c75cda6b4
@@ -803,12 +804,10 @@ typing-extensions==4.16.0 \
     --hash=sha256:dc983d19a509c94dba722ee6abd33940f7c05a89e243c47e907eb4db6f1a43e5
     # via
     #   -c requirements.txt
-    #   anyio
     #   fastapi
     #   opentelemetry-api
     #   pydantic
     #   pydantic-core
-    #   starlette
     #   stripe
     #   typing-inspection
 typing-inspection==0.4.5 \

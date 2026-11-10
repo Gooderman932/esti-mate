@@ -4,5 +4,5 @@
 -r requirements.in
 
 httpx
-mongomock-motor<0.0.30
+mongomock-motor<0.0.37
 pytest
