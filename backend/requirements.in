@@ -14,7 +14,7 @@
 
 fastapi>=0.138,<1
 google-api-python-client>=2.189,<3
-google-auth>=2.49,<3
+google-auth>=2.63.1,<3
 # Motor is deprecated in favour of PyMongo's native async API
 # (pymongo.AsyncMongoClient); plan that migration before Motor 4.
 motor>=3.7,<4
